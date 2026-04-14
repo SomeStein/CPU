@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Benchmarks",
+      "type": "shell",
+      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "args": [
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run All Benchmarks",
+      "type": "shell",
+      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "args": [
+        "run"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": [
+        "Build Benchmarks"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Analyze Runs",
+      "type": "shell",
+      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "args": [
+        "analyze"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
