@@ -1,0 +1,11 @@
+run_id=run02_20_07_15_04_26
+profile_id=smoke
+implementation=python_sloppy
+case_id=quick_parallel
+iterations=40000
+parallel_chains=4
+priority_mode=high
+affinity_mode=single_core
+timer_mode=monotonic_ns
+warmup=false
+repeat_index=1

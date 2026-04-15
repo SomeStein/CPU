@@ -1,7 +1,0 @@
-[command]
-/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaSloppy --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_19_30_15_04_26/cases/java_sloppy__stress_eight__repeat_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"java_sloppy","language":"java","variant":"sloppy","case_id":"stress_eight","warmup":false,"repeat_index":1,"iterations":300000,"parallel_chains":8,"loop_trip_count":37500,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":4424375,"ns_per_iteration":14.747916666666667,"ns_per_add":7.373958333333333,"result_checksum":"8309680536024677694","host_os":"macos","host_arch":"arm64","pid":93720,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"high","applied_affinity_mode":"unsupported","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only","runtime_name":"java","platform_extras":{}}
-
-[stderr]

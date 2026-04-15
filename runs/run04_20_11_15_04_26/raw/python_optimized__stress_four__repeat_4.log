@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/python_optimized.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_20_11_15_04_26/cases/python_optimized__stress_four__repeat_4.case
+
+[stdout]
+{"applied_affinity_mode": "unsupported", "applied_priority_mode": "unsupported", "case_id": "stress_four", "elapsed_ns": 128869333, "host_arch": "arm64", "host_os": "macos", "implementation": "python_optimized", "iterations": 750000, "language": "python", "loop_trip_count": 187500, "ns_per_add": 85.91288866666666, "ns_per_iteration": 171.82577733333332, "parallel_chains": 4, "pid": 813, "platform_extras": {}, "remainder": 0, "repeat_index": 4, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "17898040796590727156", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; affinity control unavailable", "schema_version": 1, "tid": 20688994, "timer_kind": "perf_counter_ns", "variant": "optimized", "warmup": false}
+
+[stderr]

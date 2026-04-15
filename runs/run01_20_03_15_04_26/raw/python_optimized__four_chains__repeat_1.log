@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/python_optimized.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_20_03_15_04_26/cases/python_optimized__four_chains__repeat_1.case
+
+[stdout]
+{"applied_affinity_mode": "unsupported", "applied_priority_mode": "unsupported", "case_id": "four_chains", "elapsed_ns": 80385833, "host_arch": "arm64", "host_os": "macos", "implementation": "python_optimized", "iterations": 240000, "language": "python", "loop_trip_count": 60000, "ns_per_add": 167.47048541666666, "ns_per_iteration": 334.9409708333333, "parallel_chains": 4, "pid": 168, "platform_extras": {}, "remainder": 0, "repeat_index": 1, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "3649847962422346036", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; affinity control unavailable", "schema_version": 1, "tid": 20681422, "timer_kind": "perf_counter_ns", "variant": "optimized", "warmup": false}
+
+[stderr]

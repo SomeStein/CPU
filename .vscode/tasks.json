@@ -2,47 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build Benchmarks",
-      "type": "process",
-      "command": "${workspaceFolder}/scripts/run-task.sh",
-      "windows": {
-        "command": "${workspaceFolder}\\scripts\\run-task.cmd"
-      },
-      "args": [
-        "build"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Run All Benchmarks",
-      "type": "process",
-      "command": "${workspaceFolder}/scripts/run-task.sh",
-      "windows": {
-        "command": "${workspaceFolder}\\scripts\\run-task.cmd"
-      },
-      "args": [
-        "run",
-        "--profile",
-        "balanced"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": [
-        "Build Benchmarks"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Analyze Runs",
+      "label": "Open Benchmark Launch Deck",
       "type": "process",
       "command": "${workspaceFolder}/scripts/run-task.sh",
       "windows": {
@@ -54,10 +14,10 @@
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "dependsOn": [
-        "Build Benchmarks"
-      ],
-      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "problemMatcher": []
     }
   ]

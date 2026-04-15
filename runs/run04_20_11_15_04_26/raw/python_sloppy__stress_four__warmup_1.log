@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/python_sloppy.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_20_11_15_04_26/cases/python_sloppy__stress_four__warmup_1.case
+
+[stdout]
+{"applied_affinity_mode": "unsupported", "applied_priority_mode": "unsupported", "case_id": "stress_four", "elapsed_ns": 310799750, "host_arch": "arm64", "host_os": "macos", "implementation": "python_sloppy", "iterations": 750000, "language": "python", "loop_trip_count": 187500, "ns_per_add": 207.19983333333334, "ns_per_iteration": 414.3996666666667, "parallel_chains": 4, "pid": 772, "platform_extras": {}, "remainder": 0, "repeat_index": 1, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "17898040796590727156", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; affinity control unavailable", "schema_version": 1, "tid": 20688806, "timer_kind": "perf_counter_ns", "variant": "sloppy", "warmup": true}
+
+[stderr]

@@ -1,0 +1,7 @@
+[command]
+/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaOptimized --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_20_03_15_04_26/cases/java_optimized__four_chains__repeat_3.case
+
+[stdout]
+{"schema_version":1,"implementation":"java_optimized","language":"java","variant":"optimized","case_id":"four_chains","warmup":false,"repeat_index":3,"iterations":240000,"parallel_chains":4,"loop_trip_count":60000,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":5480292,"ns_per_iteration":22.83455,"ns_per_add":11.417275,"result_checksum":"3649847962422346036","host_os":"macos","host_arch":"arm64","pid":225,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"high","applied_affinity_mode":"unsupported","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only","runtime_name":"java","platform_extras":{}}
+
+[stderr]

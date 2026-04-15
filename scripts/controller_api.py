@@ -5,19 +5,25 @@ import sys
 from pathlib import Path
 
 from benchkit.build import build_assets
-from benchkit.history import load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
+from benchkit.history import load_index_rows, load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
 from benchkit.suite import list_profiles, load_profile, run_profile
 
 
 def print_tsv(rows: list[dict[str, str]]) -> None:
     if not rows:
         return
-    headers = list(rows[0].keys())
-    sys.stdout.write("\t".join(headers) + "\n")
-    for row in rows:
-        sys.stdout.write("\t".join(row.get(header, "").replace("\t", " ").replace("\n", " ") for header in headers))
-        sys.stdout.write("\n")
-    sys.stdout.flush()
+    try:
+        headers = list(rows[0].keys())
+        sys.stdout.write("\t".join(headers) + "\n")
+        for row in rows:
+            sys.stdout.write("\t".join(row.get(header, "").replace("\t", " ").replace("\n", " ") for header in headers))
+            sys.stdout.write("\n")
+        sys.stdout.flush()
+    except BrokenPipeError:
+        try:
+            sys.stdout.close()
+        except OSError:
+            pass
 
 
 def command_profiles(_: argparse.Namespace) -> int:
@@ -52,6 +58,11 @@ def command_profile(args: argparse.Namespace) -> int:
 
 def command_runs(_: argparse.Namespace) -> int:
     print_tsv(run_summaries())
+    return 0
+
+
+def command_global_results(_: argparse.Namespace) -> int:
+    print_tsv(load_index_rows())
     return 0
 
 
@@ -134,6 +145,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs = subparsers.add_parser("runs")
     runs.set_defaults(handler=command_runs)
+
+    global_results = subparsers.add_parser("global-results")
+    global_results.set_defaults(handler=command_global_results)
 
     results = subparsers.add_parser("results")
     results.add_argument("run_id")

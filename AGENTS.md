@@ -13,6 +13,7 @@ This file is a handoff guide for future coding agents working in this repository
 - prefer extending saved profiles over hardcoding new parameters in workers
 - keep run history backward compatible with legacy tracked runs
 - treat cycle counts as optional host-specific data and never invent or estimate them
+- keep the main application as the only supported build-and-run workflow
 
 ## Timing-Safety Rules
 
@@ -49,11 +50,8 @@ Run these after substantial changes:
 
 ```bash
 python3 -m compileall scripts
-python3 scripts/launcher.py build
-python3 scripts/launcher.py run --profile smoke
-python3 scripts/launcher.py run --profile balanced
 python3 scripts/analyze_runs.py
 python3 scripts/launcher.py analyze
 ```
 
-The last command opens a GUI and may need to run outside a restricted sandbox.
+Use the application UI to prepare assets and launch smoke or balanced runs. The last command opens a GUI and may need to run outside a restricted sandbox.

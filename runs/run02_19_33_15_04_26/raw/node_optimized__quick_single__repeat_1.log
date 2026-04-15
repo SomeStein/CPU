@@ -1,7 +1,0 @@
-[command]
-/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/node_optimized.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_19_33_15_04_26/cases/node_optimized__quick_single__repeat_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"node_optimized","language":"node","variant":"optimized","case_id":"quick_single","warmup":false,"repeat_index":1,"iterations":20000,"parallel_chains":1,"loop_trip_count":20000,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":6405250,"ns_per_iteration":320.2625,"ns_per_add":160.13125,"result_checksum":"8111950104458595269","host_os":"macos","host_arch":"arm64","pid":93826,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"Node runtime uses controller-side best effort only","runtime_name":"node","platform_extras":{}}
-
-[stderr]

@@ -20,6 +20,8 @@ public final class MetricLineChartPanel extends JPanel {
     private String title = "Metric Trend";
     private String subtitle = "Pick a run to see repeat-level metrics.";
     private String yAxisLabel = "ns/iter";
+    private String xAxisLabel = "Sample";
+    private List<String> xLabels = List.of();
     private List<Series> series = List.of();
 
     public MetricLineChartPanel() {
@@ -29,10 +31,12 @@ public final class MetricLineChartPanel extends JPanel {
         setPreferredSize(new Dimension(680, 300));
     }
 
-    public void setSeries(String title, String subtitle, String yAxisLabel, List<Series> series) {
+    public void setSeries(String title, String subtitle, String yAxisLabel, String xAxisLabel, List<String> xLabels, List<Series> series) {
         this.title = title;
         this.subtitle = subtitle;
         this.yAxisLabel = yAxisLabel;
+        this.xAxisLabel = xAxisLabel;
+        this.xLabels = List.copyOf(xLabels);
         this.series = List.copyOf(series);
         repaint();
     }
@@ -52,7 +56,7 @@ public final class MetricLineChartPanel extends JPanel {
         int left = 56;
         int top = 68;
         int right = getWidth() - 18;
-        int bottom = getHeight() - 44;
+        int bottom = getHeight() - 64;
         int width = Math.max(80, right - left);
         int height = Math.max(80, bottom - top);
 
@@ -81,6 +85,7 @@ public final class MetricLineChartPanel extends JPanel {
                 max = Math.max(max, value);
             }
         }
+        longest = Math.max(longest, xLabels.size());
         if (min == Double.MAX_VALUE || max == Double.MIN_VALUE) {
             min = 0.0;
             max = 1.0;
@@ -99,11 +104,17 @@ public final class MetricLineChartPanel extends JPanel {
             g2.drawString(label, 12, y + 4);
         }
 
+        int labelStep = Math.max(1, longest / 8);
         for (int repeat = 0; repeat < longest; repeat += 1) {
-            int x = left + (longest == 1 ? width / 2 : (width * repeat / (longest - 1)));
-            g2.drawString(Integer.toString(repeat + 1), x - 3, bottom + metrics.getHeight() + 2);
+            int x = left + (longest == 1 ? width / 2 : (width * repeat / Math.max(1, longest - 1)));
+            if (repeat % labelStep != 0 && repeat != longest - 1) {
+                continue;
+            }
+            String label = repeat < xLabels.size() ? xLabels.get(repeat) : Integer.toString(repeat + 1);
+            drawCentered(g2, abbreviate(label, 12), x, bottom + metrics.getHeight() + 2);
         }
         g2.drawString(yAxisLabel, left, bottom + metrics.getHeight() * 2 + 4);
+        drawCentered(g2, xAxisLabel, left + width / 2, bottom + metrics.getHeight() * 3 + 2);
 
         for (Series item : series) {
             List<Double> values = item.values();
@@ -121,7 +132,7 @@ public final class MetricLineChartPanel extends JPanel {
             }
         }
 
-        paintLegend(g2, right - 220, 18);
+        paintLegend(g2, Math.max(left + 20, right - 280), 18);
         g2.dispose();
     }
 
@@ -137,5 +148,13 @@ public final class MetricLineChartPanel extends JPanel {
             legendY += 18;
         }
     }
-}
 
+    private static String abbreviate(String text, int max) {
+        return text.length() <= max ? text : text.substring(0, max - 1) + "…";
+    }
+
+    private static void drawCentered(Graphics2D graphics, String text, int x, int y) {
+        int width = graphics.getFontMetrics().stringWidth(text);
+        graphics.drawString(text, x - width / 2, y);
+    }
+}

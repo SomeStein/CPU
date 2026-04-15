@@ -1,0 +1,7 @@
+[command]
+/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaOptimized --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_20_07_15_04_26/cases/java_optimized__quick_parallel__warmup_1.case
+
+[stdout]
+{"schema_version":1,"implementation":"java_optimized","language":"java","variant":"optimized","case_id":"quick_parallel","warmup":true,"repeat_index":1,"iterations":40000,"parallel_chains":4,"loop_trip_count":10000,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":400167,"ns_per_iteration":10.004175,"ns_per_add":5.0020875,"result_checksum":"9095820053878083041","host_os":"macos","host_arch":"arm64","pid":400,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"high","applied_affinity_mode":"unsupported","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only","runtime_name":"java","platform_extras":{}}
+
+[stderr]

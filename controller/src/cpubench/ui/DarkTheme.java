@@ -3,6 +3,8 @@ package cpubench.ui;
 import java.awt.Color;
 import java.awt.Insets;
 import javax.swing.BorderFactory;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.Border;
@@ -24,6 +26,11 @@ public final class DarkTheme {
         setColor("TabbedPane.background", UiPalette.PANEL);
         setColor("TabbedPane.foreground", UiPalette.TEXT);
         setColor("TabbedPane.selected", UiPalette.SURFACE_ALT);
+        setColor("TabbedPane.selectHighlight", UiPalette.SURFACE_ALT);
+        setColor("TabbedPane.unselectedBackground", UiPalette.PANEL_ALT);
+        setColor("TabbedPane.selectedBackground", UiPalette.SURFACE_ALT);
+        setColor("TabbedPane.selectedForeground", UiPalette.TEXT);
+        setColor("TabbedPane.unselectedForeground", UiPalette.MUTED);
         setColor("TabbedPane.contentAreaColor", UiPalette.PANEL);
         setColor("TabbedPane.focus", UiPalette.ACCENT);
         setColor("Label.foreground", UiPalette.TEXT);
@@ -55,6 +62,8 @@ public final class DarkTheme {
         setColor("ProgressBar.foreground", UiPalette.ACCENT);
         setColor("ScrollBar.thumb", UiPalette.BORDER);
         setColor("ScrollBar.track", UiPalette.PANEL);
+        setColor("SplitPane.background", UiPalette.WINDOW);
+        setColor("SplitPaneDivider.background", UiPalette.WINDOW);
         setColor("ToolTip.background", UiPalette.SURFACE_ALT);
         setColor("ToolTip.foreground", UiPalette.TEXT);
         UIManager.put("Component.focusWidth", 1);
@@ -63,6 +72,7 @@ public final class DarkTheme {
         UIManager.put("Component.arc", 18);
         UIManager.put("ProgressBar.arc", 999);
         UIManager.put("Table.rowHeight", 26);
+        UIManager.put("SplitPane.dividerSize", 10);
         UIManager.put("defaultFont", new FontUIResource(UiPalette.BODY));
     }
 
@@ -76,5 +86,19 @@ public final class DarkTheme {
             BorderFactory.createEmptyBorder(12, 12, 12, 12)
         );
     }
-}
 
+    public static void styleTabbedPane(JTabbedPane pane) {
+        pane.setUI(new DeckTabbedPaneUI());
+        pane.setBackground(UiPalette.WINDOW);
+        pane.setForeground(UiPalette.TEXT);
+        pane.setOpaque(false);
+        pane.setFocusable(false);
+    }
+
+    public static void styleSplitPane(JSplitPane pane) {
+        pane.setOpaque(false);
+        pane.setBackground(UiPalette.WINDOW);
+        pane.setBorder(BorderFactory.createEmptyBorder());
+        pane.setDividerSize(10);
+    }
+}

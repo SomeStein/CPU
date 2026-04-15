@@ -45,24 +45,26 @@ VS Code tasks are wired through [`scripts/run-task.sh`](/Users/aaronpumm/Desktop
 Direct CLI usage:
 
 ```bash
-python3 scripts/launcher.py build
-python3 scripts/launcher.py run --profile balanced
 python3 scripts/launcher.py analyze
 python3 scripts/launcher.py summary
 python3 scripts/analyze_runs.py
 ```
+
+`build` and `run` are no longer supported top-level workflow commands. The main application prepares assets and launches benchmark runs itself.
 
 ## UI Overview
 
 The Swing app is intentionally split into controller-side UX and worker-side execution:
 
 - the launcher window is dark-mode only
+- the window opens fitted to the visible screen and supports `F11` / `Esc` fullscreen control
 - runs are started from a profile selector in the hero bar
 - menus expose refresh, run, and in-app documentation actions
 - profile blueprints are shown in the left sidebar
-- result filters update tables and graphs interactively
-- the performance tab renders stored metrics only
-- the monitoring tab renders controller-side live events only
+- dedicated run and global filters update tables and graphs interactively
+- separate workspace tabs are used for run browsing, run analysis, live monitoring, global analysis, and artifacts
+- the live monitor tab renders controller-side live events only
+- the global analysis tab compares stored data across runs without touching active timing
 - raw logs, manifest data, cycle/counter details when available, and result inspection are exposed in dedicated panes
 
 UI entrypoint:

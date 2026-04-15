@@ -1,15 +1,11 @@
 PYTHON ?= python3
 
-.PHONY: build run analyze summary
+.PHONY: open analyze summary
 
-build:
-	./scripts/run-task.sh build
-
-run:
-	./scripts/run-task.sh run --profile balanced
-
-analyze:
+open:
 	./scripts/run-task.sh analyze
+
+analyze: open
 
 summary:
 	$(PYTHON) scripts/launcher.py summary

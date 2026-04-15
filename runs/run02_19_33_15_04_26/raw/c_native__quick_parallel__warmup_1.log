@@ -1,7 +1,0 @@
-[command]
-/Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/bin/macos-arm64/c_native --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_19_33_15_04_26/cases/c_native__quick_parallel__warmup_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"c_native","language":"c","variant":"native","case_id":"quick_parallel","warmup":true,"repeat_index":1,"iterations":40000,"parallel_chains":4,"loop_trip_count":10000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":13000,"ns_per_iteration":0.325000,"ns_per_add":0.162500,"result_checksum":"9095820053878083041","host_os":"macos","host_arch":"arm64","pid":93804,"tid":8235830272,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"best-effort scheduler controls unavailable on this host","runtime_name":"c_native","platform_extras":{"counter_frequency":0}}
-
-[stderr]

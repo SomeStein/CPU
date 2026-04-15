@@ -1,7 +1,0 @@
-[command]
-/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/node_optimized.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_19_33_15_04_26/cases/node_optimized__quick_parallel__warmup_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"node_optimized","language":"node","variant":"optimized","case_id":"quick_parallel","warmup":true,"repeat_index":1,"iterations":40000,"parallel_chains":4,"loop_trip_count":10000,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":6929375,"ns_per_iteration":173.234375,"ns_per_add":86.6171875,"result_checksum":"9095820053878083041","host_os":"macos","host_arch":"arm64","pid":93827,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"Node runtime uses controller-side best effort only","runtime_name":"node","platform_extras":{}}
-
-[stderr]

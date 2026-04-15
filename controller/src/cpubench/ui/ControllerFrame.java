@@ -1,19 +1,26 @@
 package cpubench.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,24 +42,49 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
+import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import cpubench.api.BackendClient;
+import cpubench.model.ControllerState;
+import cpubench.model.FilterState;
 import cpubench.model.TableData;
 
 public final class ControllerFrame {
+    private static final List<String> LIVE_EVENT_HEADERS = List.of(
+        "event_type",
+        "phase",
+        "run_id",
+        "profile_id",
+        "implementation",
+        "case_id",
+        "repeat_index",
+        "warmup",
+        "status",
+        "metric",
+        "metric_kind",
+        "elapsed_ns",
+        "timer_kind",
+        "step_index",
+        "step_total",
+        "message"
+    );
+
     private final BackendClient backend;
+    private final ControllerState state;
     private final JFrame frame;
+    private final GraphicsDevice graphicsDevice;
+    private final JTabbedPane workspaceTabs;
     private final JComboBox<String> profileSelector;
     private final JButton runButton;
     private final JButton refreshButton;
@@ -60,40 +92,48 @@ public final class ControllerFrame {
     private final JLabel statusPill;
     private final JProgressBar progressBar;
     private final JTextArea profileArea;
-    private final JTextArea monitorArea;
+    private final JTextArea runSummaryArea;
+    private final JTextArea liveStatusArea;
+    private final JTextArea globalMonitorArea;
     private final JTextArea detailArea;
     private final JTextArea rawLogArea;
     private final JTextArea manifestArea;
     private final JTextArea liveLogArea;
-    private final JComboBox<String> implementationFilter;
-    private final JComboBox<String> caseFilter;
-    private final JComboBox<String> statusFilter;
-    private final JCheckBox measuredOnlyToggle;
+    private final JComboBox<String> runImplementationFilter;
+    private final JComboBox<String> runCaseFilter;
+    private final JComboBox<String> runStatusFilter;
+    private final JCheckBox runMeasuredOnlyToggle;
+    private final JComboBox<String> globalProfileFilter;
+    private final JComboBox<String> globalImplementationFilter;
+    private final JComboBox<String> globalCaseFilter;
+    private final JComboBox<String> globalStatusFilter;
+    private final JCheckBox globalMeasuredOnlyToggle;
     private final JTable runsTable;
     private final JTable resultsTable;
     private final JTable eventsTable;
+    private final JTable globalResultsTable;
     private final DefaultTableModel runsModel;
     private final DefaultTableModel resultsModel;
     private final DefaultTableModel eventsModel;
-    private final MetricLineChartPanel lineChart;
-    private final ImplementationBarChartPanel barChart;
+    private final DefaultTableModel globalResultsModel;
+    private final MetricLineChartPanel runLineChart;
+    private final ImplementationBarChartPanel runBarChart;
+    private final MetricLineChartPanel globalLineChart;
+    private final ImplementationBarChartPanel globalBarChart;
 
-    private TableData profilesData = TableData.empty();
-    private TableData runsData = TableData.empty();
-    private TableData allResultsData = TableData.empty();
-    private TableData displayedResultsData = TableData.empty();
-    private TableData eventsData = TableData.empty();
-    private TableData manifestData = TableData.empty();
-    private String currentRunId = "";
-    private String currentProfileId = "";
     private String pendingRunSelection = "";
     private Process activeProcess;
     private List<String> runEventHeaders = List.of();
     private final List<Map<String, String>> liveMetricRows = new ArrayList<>();
+    private Rectangle windowedBounds;
+    private boolean fullscreen;
 
     public ControllerFrame(BackendClient backend) {
         this.backend = backend;
+        this.state = new ControllerState();
         this.frame = new JFrame("CPU Benchmark Launch Deck");
+        this.graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        this.workspaceTabs = createTabbedPane();
         this.profileSelector = new JComboBox<>();
         this.runButton = createButton("Run Profile", IconFactory.playIcon(16, UiPalette.WINDOW));
         this.refreshButton = createButton("Refresh", IconFactory.refreshIcon(16, UiPalette.TEXT));
@@ -101,34 +141,46 @@ public final class ControllerFrame {
         this.statusPill = buildStatusPill();
         this.progressBar = new JProgressBar();
         this.profileArea = buildTextArea();
-        this.monitorArea = buildTextArea();
+        this.runSummaryArea = buildTextArea();
+        this.liveStatusArea = buildTextArea();
+        this.globalMonitorArea = buildTextArea();
         this.detailArea = buildTextArea();
         this.rawLogArea = buildTextArea();
         this.manifestArea = buildTextArea();
         this.liveLogArea = buildTextArea();
-        this.implementationFilter = new JComboBox<>(new String[] {"All"});
-        this.caseFilter = new JComboBox<>(new String[] {"All"});
-        this.statusFilter = new JComboBox<>(new String[] {"All", "success", "failed"});
-        this.measuredOnlyToggle = new JCheckBox("Hide Warmups", true);
+        this.runImplementationFilter = new JComboBox<>(new String[] {"All"});
+        this.runCaseFilter = new JComboBox<>(new String[] {"All"});
+        this.runStatusFilter = new JComboBox<>(new String[] {"All", "success", "partial_failure", "failed"});
+        this.runMeasuredOnlyToggle = new JCheckBox("Hide Warmups", true);
+        this.globalProfileFilter = new JComboBox<>(new String[] {"All"});
+        this.globalImplementationFilter = new JComboBox<>(new String[] {"All"});
+        this.globalCaseFilter = new JComboBox<>(new String[] {"All"});
+        this.globalStatusFilter = new JComboBox<>(new String[] {"All", "success", "partial_failure", "failed"});
+        this.globalMeasuredOnlyToggle = new JCheckBox("Hide Warmups", true);
         this.runsModel = new DefaultTableModel();
         this.resultsModel = new DefaultTableModel();
         this.eventsModel = new DefaultTableModel();
+        this.globalResultsModel = new DefaultTableModel();
         this.runsTable = new JTable(runsModel);
         this.resultsTable = new JTable(resultsModel);
         this.eventsTable = new JTable(eventsModel);
-        this.lineChart = new MetricLineChartPanel();
-        this.barChart = new ImplementationBarChartPanel();
+        this.globalResultsTable = new JTable(globalResultsModel);
+        this.runLineChart = new MetricLineChartPanel();
+        this.runBarChart = new ImplementationBarChartPanel();
+        this.globalLineChart = new MetricLineChartPanel();
+        this.globalBarChart = new ImplementationBarChartPanel();
         buildUi();
     }
 
     public void showWindow() {
         refreshAll();
+        fitToVisibleScreen();
         frame.setVisible(true);
     }
 
     private void buildUi() {
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.setMinimumSize(new Dimension(1560, 960));
+        frame.setMinimumSize(new Dimension(1220, 760));
         frame.getContentPane().setBackground(UiPalette.WINDOW);
         frame.setLayout(new BorderLayout(14, 14));
         frame.setJMenuBar(buildMenuBar());
@@ -141,10 +193,16 @@ public final class ControllerFrame {
         header.add(buildToolbar(), BorderLayout.EAST);
         frame.add(header, BorderLayout.NORTH);
 
-        JSplitPane shell = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, buildSidebar(), buildWorkspace());
+        workspaceTabs.addTab("Run Browser", IconFactory.logsIcon(14, UiPalette.TEXT), buildRunBrowserView());
+        workspaceTabs.addTab("Run Analysis", IconFactory.chartIcon(14, UiPalette.TEXT), buildRunAnalysisView());
+        workspaceTabs.addTab("Live Monitor", IconFactory.radarIcon(14, UiPalette.TEXT), buildLiveMonitorView());
+        workspaceTabs.addTab("Global Analysis", IconFactory.chartIcon(14, UiPalette.TEXT), buildGlobalAnalysisView());
+        workspaceTabs.addTab("Artifacts", IconFactory.docsIcon(14, UiPalette.TEXT), buildArtifactsView());
+
+        JSplitPane shell = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, buildSidebar(), workspaceTabs);
+        shell.setResizeWeight(0.22);
+        DarkTheme.styleSplitPane(shell);
         shell.setBorder(BorderFactory.createEmptyBorder(0, 14, 14, 14));
-        shell.setResizeWeight(0.24);
-        shell.setOpaque(false);
         frame.add(shell, BorderLayout.CENTER);
 
         runsTable.getSelectionModel().addListSelectionListener(event -> {
@@ -154,14 +212,24 @@ public final class ControllerFrame {
         });
         resultsTable.getSelectionModel().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) {
-                inspectSelectedResult();
+                inspectSelectedRunResult();
             }
         });
+        globalResultsTable.getSelectionModel().addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) {
+                inspectSelectedGlobalResult();
+            }
+        });
+
+        installWindowControls();
         frame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent event) {
                 if (activeProcess != null) {
                     activeProcess.destroy();
+                }
+                if (fullscreen) {
+                    graphicsDevice.setFullScreenWindow(null);
                 }
             }
         });
@@ -172,6 +240,8 @@ public final class ControllerFrame {
 
         JMenu file = new JMenu("File");
         file.add(menuItem("Refresh Data", IconFactory.refreshIcon(14, UiPalette.TEXT), event -> refreshAll()));
+        file.add(menuItem("Toggle Fullscreen", IconFactory.chartIcon(14, UiPalette.TEXT), event -> toggleFullscreen()));
+        file.add(menuItem("Exit Fullscreen", IconFactory.logsIcon(14, UiPalette.TEXT), event -> exitFullscreen()));
         file.add(menuItem("Exit", IconFactory.logsIcon(14, UiPalette.TEXT), event -> frame.dispose()));
 
         JMenu run = new JMenu("Run");
@@ -205,7 +275,7 @@ public final class ControllerFrame {
         JLabel title = new JLabel("Benchmark Launch Deck");
         title.setForeground(UiPalette.TEXT);
         title.setFont(UiPalette.DISPLAY);
-        JLabel subtitle = new JLabel("Dark-mode mission control for runs, history, live telemetry, graphs, and raw inspection.");
+        JLabel subtitle = new JLabel("Fullscreen-ready command center for runs, global analysis, live telemetry, and artifacts.");
         subtitle.setForeground(UiPalette.MUTED);
         subtitle.setFont(UiPalette.SUBTITLE);
         panel.add(title, BorderLayout.NORTH);
@@ -228,9 +298,10 @@ public final class ControllerFrame {
 
         JPanel statusRow = new JPanel(new BorderLayout(10, 0));
         statusRow.setOpaque(false);
-        progressBar.setStringPainted(false);
-        progressBar.setPreferredSize(new Dimension(320, 16));
+        progressBar.setStringPainted(true);
+        progressBar.setPreferredSize(new Dimension(360, 16));
         progressBar.setValue(0);
+        progressBar.setString("F11 fullscreen • Esc exit");
         statusRow.add(progressBar, BorderLayout.CENTER);
         statusRow.add(statusPill, BorderLayout.EAST);
 
@@ -242,8 +313,8 @@ public final class ControllerFrame {
         docsButton.addActionListener(event -> showDocument("README.md", Path.of("README.md")));
         profileSelector.addActionListener(event -> {
             String profileId = (String) profileSelector.getSelectedItem();
-            if (profileId != null && !Objects.equals(profileId, currentProfileId)) {
-                currentProfileId = profileId;
+            if (profileId != null && !Objects.equals(profileId, state.currentProfileId())) {
+                state.setCurrentProfileId(profileId);
                 loadProfilePreview(profileId);
             }
         });
@@ -251,87 +322,138 @@ public final class ControllerFrame {
     }
 
     private Component buildSidebar() {
-        JPanel sidebar = new JPanel(new BorderLayout(0, 12));
-        sidebar.setOpaque(false);
-
         JPanel stack = new JPanel();
         stack.setOpaque(false);
         stack.setLayout(new javax.swing.BoxLayout(stack, javax.swing.BoxLayout.Y_AXIS));
-        stack.add(section("Profile Blueprint", profileArea, new Dimension(320, 210)));
+        stack.add(textSection("Profile Blueprint", profileArea, new Dimension(320, 220)));
         stack.add(javax.swing.Box.createVerticalStrut(12));
-        stack.add(section("Live Monitor", monitorArea, new Dimension(320, 200)));
+        stack.add(textSection("Selected Run", runSummaryArea, new Dimension(320, 220)));
         stack.add(javax.swing.Box.createVerticalStrut(12));
-        stack.add(buildFilterSection());
+        stack.add(buildRunFilterSection());
+        stack.add(javax.swing.Box.createVerticalStrut(12));
+        stack.add(buildGlobalFilterSection());
 
-        sidebar.add(new JScrollPane(stack), BorderLayout.CENTER);
-        return sidebar;
+        JScrollPane scrollPane = new JScrollPane(stack);
+        scrollPane.getViewport().setBackground(UiPalette.WINDOW);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        return scrollPane;
     }
 
-    private Component buildFilterSection() {
+    private Component buildRunFilterSection() {
         JPanel panel = new JPanel(new BorderLayout(0, 10));
         panel.setBackground(UiPalette.PANEL);
         panel.setBorder(DarkTheme.panelBorder());
-        JLabel title = label("Interactive Filters");
+        JLabel title = label("Run Filters");
         title.setFont(UiPalette.LABEL.deriveFont(13f));
         panel.add(title, BorderLayout.NORTH);
 
         JPanel controls = new JPanel(new GridLayout(4, 2, 8, 8));
         controls.setOpaque(false);
         controls.add(label("Implementation"));
-        controls.add(implementationFilter);
+        controls.add(runImplementationFilter);
         controls.add(label("Case"));
-        controls.add(caseFilter);
+        controls.add(runCaseFilter);
         controls.add(label("Status"));
-        controls.add(statusFilter);
+        controls.add(runStatusFilter);
         controls.add(new JLabel());
-        controls.add(measuredOnlyToggle);
+        controls.add(runMeasuredOnlyToggle);
         panel.add(controls, BorderLayout.CENTER);
 
-        implementationFilter.addActionListener(event -> applyResultFilters());
-        caseFilter.addActionListener(event -> applyResultFilters());
-        statusFilter.addActionListener(event -> applyResultFilters());
-        measuredOnlyToggle.addActionListener(event -> applyResultFilters());
+        runImplementationFilter.addActionListener(event -> applyRunFilters());
+        runCaseFilter.addActionListener(event -> applyRunFilters());
+        runStatusFilter.addActionListener(event -> applyRunFilters());
+        runMeasuredOnlyToggle.addActionListener(event -> applyRunFilters());
         return panel;
     }
 
-    private Component buildWorkspace() {
-        JTabbedPane analyticsTabs = new JTabbedPane();
-        analyticsTabs.addTab("Performance", IconFactory.chartIcon(14, UiPalette.TEXT), buildPerformanceView());
-        analyticsTabs.addTab("Monitoring", IconFactory.radarIcon(14, UiPalette.TEXT), buildMonitoringView());
+    private Component buildGlobalFilterSection() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(UiPalette.PANEL);
+        panel.setBorder(DarkTheme.panelBorder());
+        JLabel title = label("Global Filters");
+        title.setFont(UiPalette.LABEL.deriveFont(13f));
+        panel.add(title, BorderLayout.NORTH);
 
-        JTabbedPane dataTabs = new JTabbedPane();
-        dataTabs.addTab("Runs", IconFactory.logsIcon(14, UiPalette.TEXT), tableScroll(runsTable));
-        dataTabs.addTab("Results", IconFactory.chartIcon(14, UiPalette.TEXT), tableScroll(resultsTable));
-        dataTabs.addTab("Events", IconFactory.radarIcon(14, UiPalette.TEXT), tableScroll(eventsTable));
+        JPanel controls = new JPanel(new GridLayout(5, 2, 8, 8));
+        controls.setOpaque(false);
+        controls.add(label("Profile"));
+        controls.add(globalProfileFilter);
+        controls.add(label("Implementation"));
+        controls.add(globalImplementationFilter);
+        controls.add(label("Case"));
+        controls.add(globalCaseFilter);
+        controls.add(label("Status"));
+        controls.add(globalStatusFilter);
+        controls.add(new JLabel());
+        controls.add(globalMeasuredOnlyToggle);
+        panel.add(controls, BorderLayout.CENTER);
 
-        JTabbedPane inspectorTabs = new JTabbedPane();
+        globalProfileFilter.addActionListener(event -> applyGlobalFilters());
+        globalImplementationFilter.addActionListener(event -> applyGlobalFilters());
+        globalCaseFilter.addActionListener(event -> applyGlobalFilters());
+        globalStatusFilter.addActionListener(event -> applyGlobalFilters());
+        globalMeasuredOnlyToggle.addActionListener(event -> applyGlobalFilters());
+        return panel;
+    }
+
+    private Component buildRunBrowserView() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setOpaque(false);
+        panel.add(tableScroll(runsTable), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private Component buildRunAnalysisView() {
+        JTabbedPane chartTabs = createTabbedPane();
+        chartTabs.addTab("Metric Trend", IconFactory.chartIcon(14, UiPalette.TEXT), runLineChart);
+        chartTabs.addTab("Implementation Ladder", IconFactory.chartIcon(14, UiPalette.TEXT), runBarChart);
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, chartTabs, tableScroll(resultsTable));
+        split.setResizeWeight(0.58);
+        DarkTheme.styleSplitPane(split);
+        return split;
+    }
+
+    private Component buildLiveMonitorView() {
+        JSplitPane bottom = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableScroll(eventsTable), textScroll(liveLogArea));
+        bottom.setResizeWeight(0.58);
+        DarkTheme.styleSplitPane(bottom);
+
+        JSplitPane shell = new JSplitPane(JSplitPane.VERTICAL_SPLIT, textScroll(liveStatusArea), bottom);
+        shell.setResizeWeight(0.24);
+        DarkTheme.styleSplitPane(shell);
+        return shell;
+    }
+
+    private Component buildGlobalAnalysisView() {
+        JTabbedPane globalCharts = createTabbedPane();
+        globalCharts.addTab("Cross-Run Trend", IconFactory.chartIcon(14, UiPalette.TEXT), globalLineChart);
+        globalCharts.addTab("Implementation Scoreboard", IconFactory.chartIcon(14, UiPalette.TEXT), globalBarChart);
+
+        JPanel top = new JPanel(new BorderLayout(0, 10));
+        top.setOpaque(false);
+        top.add(textSection("Global Monitor", globalMonitorArea, null), BorderLayout.NORTH);
+        top.add(globalCharts, BorderLayout.CENTER);
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, top, tableScroll(globalResultsTable));
+        split.setResizeWeight(0.58);
+        DarkTheme.styleSplitPane(split);
+        return split;
+    }
+
+    private Component buildArtifactsView() {
+        JTabbedPane inspectorTabs = createTabbedPane();
         inspectorTabs.addTab("Inspector", IconFactory.docsIcon(14, UiPalette.TEXT), textScroll(detailArea));
         inspectorTabs.addTab("Raw Log", IconFactory.logsIcon(14, UiPalette.TEXT), textScroll(rawLogArea));
         inspectorTabs.addTab("Manifest", IconFactory.docsIcon(14, UiPalette.TEXT), textScroll(manifestArea));
         inspectorTabs.addTab("Live Feed", IconFactory.radarIcon(14, UiPalette.TEXT), textScroll(liveLogArea));
-
-        JSplitPane bottom = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, dataTabs, inspectorTabs);
-        bottom.setResizeWeight(0.62);
-        bottom.setOpaque(false);
-
-        JSplitPane center = new JSplitPane(JSplitPane.VERTICAL_SPLIT, analyticsTabs, bottom);
-        center.setResizeWeight(0.44);
-        center.setOpaque(false);
-        return center;
+        return inspectorTabs;
     }
 
-    private Component buildPerformanceView() {
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, lineChart, barChart);
-        split.setResizeWeight(0.68);
-        split.setOpaque(false);
-        return split;
-    }
-
-    private Component buildMonitoringView() {
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tableScroll(eventsTable), textScroll(liveLogArea));
-        split.setResizeWeight(0.6);
-        split.setOpaque(false);
-        return split;
+    private JTabbedPane createTabbedPane() {
+        JTabbedPane pane = new JTabbedPane();
+        DarkTheme.styleTabbedPane(pane);
+        return pane;
     }
 
     private JScrollPane tableScroll(JTable table) {
@@ -349,17 +471,20 @@ public final class ControllerFrame {
         return scrollPane;
     }
 
-    private JPanel section(String titleText, JTextArea area, Dimension size) {
+    private JPanel textSection(String titleText, JTextArea area, Dimension size) {
+        JScrollPane scroll = new JScrollPane(area);
+        scroll.getViewport().setBackground(UiPalette.SURFACE);
+        if (size != null) {
+            scroll.setPreferredSize(size);
+        }
+        scroll.setBorder(BorderFactory.createLineBorder(UiPalette.BORDER, 1, true));
+
         JPanel panel = new JPanel(new BorderLayout(0, 8));
         panel.setBackground(UiPalette.PANEL);
         panel.setBorder(DarkTheme.panelBorder());
         JLabel title = label(titleText);
         title.setFont(UiPalette.LABEL.deriveFont(13f));
         panel.add(title, BorderLayout.NORTH);
-        JScrollPane scroll = new JScrollPane(area);
-        scroll.getViewport().setBackground(UiPalette.SURFACE);
-        scroll.setPreferredSize(size);
-        scroll.setBorder(BorderFactory.createLineBorder(UiPalette.BORDER, 1, true));
         panel.add(scroll, BorderLayout.CENTER);
         return panel;
     }
@@ -418,6 +543,10 @@ public final class ControllerFrame {
         table.setShowVerticalLines(true);
         table.setShowHorizontalLines(true);
         table.setIntercellSpacing(new Dimension(1, 1));
+        table.setSelectionBackground(UiPalette.ACCENT);
+        table.setSelectionForeground(UiPalette.WINDOW);
+        table.setBackground(UiPalette.SURFACE);
+        table.setForeground(UiPalette.TEXT);
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(
@@ -430,32 +559,93 @@ public final class ControllerFrame {
             ) {
                 Component component = super.getTableCellRendererComponent(localTable, value, isSelected, hasFocus, row, column);
                 setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 6));
-                if (!isSelected) {
-                    component.setBackground(row % 2 == 0 ? UiPalette.SURFACE : UiPalette.SURFACE_ALT);
-                    component.setForeground(UiPalette.TEXT);
-                    String columnName = localTable.getColumnName(column);
-                    if ("status".equals(columnName)) {
-                        component.setForeground(UiPalette.statusColor(String.valueOf(value)));
-                    }
+                if (isSelected) {
+                    component.setBackground(UiPalette.ACCENT);
+                    component.setForeground(UiPalette.WINDOW);
+                    return component;
+                }
+                component.setBackground(row % 2 == 0 ? UiPalette.SURFACE : UiPalette.SURFACE_ALT);
+                component.setForeground(UiPalette.TEXT);
+                String columnName = localTable.getColumnName(column);
+                if ("status".equals(columnName)) {
+                    component.setForeground(UiPalette.statusColor(String.valueOf(value)));
                 }
                 return component;
             }
         });
     }
 
+    private void installWindowControls() {
+        JRootPane root = frame.getRootPane();
+        root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F11, 0), "toggleFullscreen");
+        root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "exitFullscreen");
+        root.getActionMap().put("toggleFullscreen", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                toggleFullscreen();
+            }
+        });
+        root.getActionMap().put("exitFullscreen", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                exitFullscreen();
+            }
+        });
+    }
+
+    private void fitToVisibleScreen() {
+        Rectangle bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+        windowedBounds = new Rectangle(bounds);
+        frame.setBounds(bounds);
+        frame.validate();
+    }
+
+    private void toggleFullscreen() {
+        if (fullscreen) {
+            exitFullscreen();
+            return;
+        }
+        windowedBounds = frame.getBounds();
+        frame.dispose();
+        frame.setUndecorated(true);
+        frame.setVisible(true);
+        graphicsDevice.setFullScreenWindow(frame);
+        fullscreen = true;
+    }
+
+    private void exitFullscreen() {
+        if (!fullscreen) {
+            fitToVisibleScreen();
+            return;
+        }
+        graphicsDevice.setFullScreenWindow(null);
+        frame.dispose();
+        frame.setUndecorated(false);
+        frame.setVisible(true);
+        fullscreen = false;
+        if (windowedBounds != null) {
+            frame.setBounds(windowedBounds);
+        } else {
+            fitToVisibleScreen();
+        }
+    }
+
     private void refreshAll() {
         setStatus("Refreshing data", UiPalette.INFO);
         runButton.setEnabled(false);
         refreshButton.setEnabled(false);
+        docsButton.setEnabled(false);
 
         new SwingWorker<Void, Void>() {
             private TableData loadedProfiles = TableData.empty();
             private TableData loadedRuns = TableData.empty();
+            private TableData loadedGlobalResults = TableData.empty();
 
             @Override
             protected Void doInBackground() throws Exception {
                 loadedProfiles = backend.readTable("profiles");
                 loadedRuns = backend.readTable("runs");
+                loadedGlobalResults = backend.readTable("global-results");
                 return null;
             }
 
@@ -463,36 +653,56 @@ public final class ControllerFrame {
             protected void done() {
                 try {
                     get();
-                    profilesData = loadedProfiles;
-                    runsData = loadedRuns;
+                    state.setProfiles(loadedProfiles);
+                    state.setRuns(loadedRuns);
+                    state.setGlobalResults(loadedGlobalResults);
                     populateProfileSelector();
-                    applyTable(runsModel, runsData);
+                    applyTable(runsModel, state.runs());
+                    populateGlobalFilters();
+                    applyGlobalFilters();
                     if (!pendingRunSelection.isBlank()) {
                         selectRunRow(pendingRunSelection);
                         pendingRunSelection = "";
+                    } else if (!state.currentRunId().isBlank()) {
+                        selectRunRow(state.currentRunId());
                     } else if (runsModel.getRowCount() > 0) {
                         runsTable.setRowSelectionInterval(0, 0);
                         loadSelectedRun();
                     } else {
-                        applyTable(resultsModel, TableData.empty());
-                        applyTable(eventsModel, TableData.empty());
+                        clearRunWorkspace();
+                        setStatus("Deck ready", UiPalette.SUCCESS);
                     }
-                    setStatus("Deck ready", UiPalette.SUCCESS);
                 } catch (Exception error) {
                     setStatus("Refresh failed", UiPalette.DANGER);
                     liveLogArea.append("[refresh-error] " + error.getMessage() + "\n");
                 } finally {
                     runButton.setEnabled(profileSelector.getItemCount() > 0);
                     refreshButton.setEnabled(true);
+                    docsButton.setEnabled(true);
                 }
             }
         }.execute();
     }
 
+    private void clearRunWorkspace() {
+        state.setRunResults(TableData.empty());
+        state.setRunEvents(TableData.empty());
+        state.setRunManifest(TableData.empty());
+        applyTable(resultsModel, TableData.empty());
+        applyTable(eventsModel, TableData.empty());
+        manifestArea.setText("");
+        detailArea.setText("Select a run to inspect stored measurements.");
+        rawLogArea.setText("");
+        runSummaryArea.setText("No run selected.");
+        liveStatusArea.setText("No run selected.\nStart a profile or load a stored run.");
+        runLineChart.setSeries("Metric Trend", "Select a run to render repeat-level metrics.", "ns/iter", "Repeat", List.of(), List.of());
+        runBarChart.setBars("Best By Implementation", "Select a run to compare implementations.", "ns/iter", List.of());
+    }
+
     private void populateProfileSelector() {
         String currentSelection = (String) profileSelector.getSelectedItem();
         profileSelector.removeAllItems();
-        for (Map<String, String> row : profilesData.asMaps()) {
+        for (Map<String, String> row : state.profiles().asMaps()) {
             profileSelector.addItem(row.getOrDefault("profile_id", ""));
         }
         if (currentSelection != null) {
@@ -501,15 +711,15 @@ public final class ControllerFrame {
         if (profileSelector.getSelectedItem() == null && profileSelector.getItemCount() > 0) {
             profileSelector.setSelectedIndex(0);
         }
-        currentProfileId = (String) profileSelector.getSelectedItem();
-        if (currentProfileId != null && !currentProfileId.isBlank()) {
-            loadProfilePreview(currentProfileId);
+        state.setCurrentProfileId((String) profileSelector.getSelectedItem());
+        if (state.currentProfileId() != null && !state.currentProfileId().isBlank()) {
+            loadProfilePreview(state.currentProfileId());
         }
     }
 
     private void selectProfile(String profileId) {
         profileSelector.setSelectedItem(profileId);
-        currentProfileId = profileId;
+        state.setCurrentProfileId(profileId);
         loadProfilePreview(profileId);
     }
 
@@ -538,8 +748,8 @@ public final class ControllerFrame {
                             .append(row.getOrDefault("priority_mode", ""))
                             .append(" / ")
                             .append(row.getOrDefault("affinity_mode", ""))
-                            .append('\n')
                             .append('\n');
+                        builder.append("  implementations: ").append(row.getOrDefault("implementations", "")).append('\n').append('\n');
                     }
                     profileArea.setText(builder.toString().stripTrailing());
                 } catch (Exception error) {
@@ -559,7 +769,7 @@ public final class ControllerFrame {
         if (runId.isBlank()) {
             return;
         }
-        currentRunId = runId;
+        state.setCurrentRunId(runId);
         loadRun(runId);
     }
 
@@ -582,13 +792,16 @@ public final class ControllerFrame {
             protected void done() {
                 try {
                     get();
-                    allResultsData = loadedResults;
-                    eventsData = loadedEvents;
-                    manifestData = loadedManifest;
-                    applyTable(eventsModel, eventsData);
-                    manifestArea.setText(formatKeyValueTable(manifestData));
-                    populateFilters();
-                    applyResultFilters();
+                    state.setRunResults(loadedResults);
+                    state.setRunEvents(loadedEvents);
+                    state.setRunManifest(loadedManifest);
+                    applyTable(eventsModel, state.runEvents());
+                    manifestArea.setText(formatKeyValueTable(state.runManifest()));
+                    populateRunFilters();
+                    applyRunFilters();
+                    renderSelectedRunSummary();
+                    renderLiveMonitorSnapshot(null);
+                    workspaceTabs.setSelectedIndex(1);
                     setStatus("Loaded " + runId, UiPalette.SUCCESS);
                 } catch (Exception error) {
                     setStatus("Run load failed", UiPalette.DANGER);
@@ -598,9 +811,15 @@ public final class ControllerFrame {
         }.execute();
     }
 
-    private void populateFilters() {
-        repopulateCombo(implementationFilter, allResultsData.distinctValues("implementation"));
-        repopulateCombo(caseFilter, allResultsData.distinctValues("case_id"));
+    private void populateRunFilters() {
+        repopulateCombo(runImplementationFilter, state.runResults().distinctValues("implementation"));
+        repopulateCombo(runCaseFilter, state.runResults().distinctValues("case_id"));
+    }
+
+    private void populateGlobalFilters() {
+        repopulateCombo(globalProfileFilter, state.globalResults().distinctValues("profile_id"));
+        repopulateCombo(globalImplementationFilter, state.globalResults().distinctValues("implementation"));
+        repopulateCombo(globalCaseFilter, state.globalResults().distinctValues("case_id"));
     }
 
     private void repopulateCombo(JComboBox<String> combo, Set<String> values) {
@@ -618,71 +837,174 @@ public final class ControllerFrame {
         }
     }
 
-    private void applyResultFilters() {
-        List<Map<String, String>> filtered = new ArrayList<>();
-        String implementation = (String) implementationFilter.getSelectedItem();
-        String caseId = (String) caseFilter.getSelectedItem();
-        String status = (String) statusFilter.getSelectedItem();
-        boolean measuredOnly = measuredOnlyToggle.isSelected();
-
-        for (Map<String, String> row : allResultsData.asMaps()) {
-            if (!"All".equals(implementation) && !Objects.equals(implementation, row.get("implementation"))) {
-                continue;
-            }
-            if (!"All".equals(caseId) && !Objects.equals(caseId, row.get("case_id"))) {
-                continue;
-            }
-            if (!"All".equals(status) && !Objects.equals(status, row.get("status"))) {
-                continue;
-            }
-            if (measuredOnly && "true".equals(row.get("warmup"))) {
-                continue;
-            }
-            filtered.add(row);
-        }
-
-        displayedResultsData = mapsToTableData(filtered, allResultsData.headers());
-        applyTable(resultsModel, displayedResultsData);
+    private void applyRunFilters() {
+        state.setRunFilter(currentRunFilter());
+        TableData filtered = state.filteredRunResults();
+        applyTable(resultsModel, filtered);
+        updateRunCharts(filtered.asMaps());
+        renderSelectedRunSummary();
+        renderLiveMonitorSnapshot(null);
         if (resultsModel.getRowCount() > 0) {
             resultsTable.setRowSelectionInterval(0, 0);
-            inspectSelectedResult();
+            inspectSelectedRunResult();
         } else {
-            detailArea.setText("No results match the current filters.");
+            detailArea.setText("No run results match the current filters.");
             rawLogArea.setText("");
         }
-        updateCharts(filtered);
-        updateMonitorSummary(filtered);
     }
 
-    private void updateMonitorSummary(List<Map<String, String>> rows) {
+    private void applyGlobalFilters() {
+        state.setGlobalFilter(currentGlobalFilter());
+        TableData filtered = state.filteredGlobalResults();
+        applyTable(globalResultsModel, filtered);
+        updateGlobalCharts(filtered.asMaps());
+        renderGlobalSummary(filtered.asMaps());
+    }
+
+    private FilterState currentRunFilter() {
+        return new FilterState(
+            (String) runImplementationFilter.getSelectedItem(),
+            (String) runCaseFilter.getSelectedItem(),
+            (String) runStatusFilter.getSelectedItem(),
+            "All",
+            runMeasuredOnlyToggle.isSelected()
+        );
+    }
+
+    private FilterState currentGlobalFilter() {
+        return new FilterState(
+            (String) globalImplementationFilter.getSelectedItem(),
+            (String) globalCaseFilter.getSelectedItem(),
+            (String) globalStatusFilter.getSelectedItem(),
+            (String) globalProfileFilter.getSelectedItem(),
+            globalMeasuredOnlyToggle.isSelected()
+        );
+    }
+
+    private void renderSelectedRunSummary() {
         StringBuilder builder = new StringBuilder();
-        builder.append("Selected run: ").append(currentRunId.isBlank() ? "none" : currentRunId).append('\n');
-        builder.append("Visible samples: ").append(rows.size()).append('\n');
-        builder.append("Filters: ")
-            .append(implementationFilter.getSelectedItem()).append(" / ")
-            .append(caseFilter.getSelectedItem()).append(" / ")
-            .append(statusFilter.getSelectedItem()).append('\n');
-        if (!rows.isEmpty()) {
-            Map<String, String> first = rows.get(0);
-            builder.append("Timer: ").append(metricKind(first)).append('\n');
+        if (state.currentRunId().isBlank()) {
+            runSummaryArea.setText("No run selected.");
+            return;
         }
-        monitorArea.setText(builder.toString());
+
+        Map<String, String> run = findRow(state.runs().asMaps(), "run_id", state.currentRunId());
+        TableData filteredData = state.filteredRunResults();
+        List<Map<String, String>> filtered = filteredData.asMaps();
+        builder.append("Run: ").append(state.currentRunId()).append('\n');
+        if (!run.isEmpty()) {
+            builder.append("Profile: ").append(run.getOrDefault("profile_name", run.getOrDefault("profile_id", ""))).append('\n');
+            builder.append("Host: ").append(run.getOrDefault("host_os", "")).append(" / ").append(run.getOrDefault("host_arch", "")).append('\n');
+            builder.append("Status: ").append(run.getOrDefault("status", "")).append('\n');
+            builder.append("Started: ").append(run.getOrDefault("started_at", "")).append('\n');
+        }
+        builder.append("Visible samples: ").append(filtered.size()).append('\n');
+
+        MetricSample best = bestMetric(filtered);
+        if (best != null) {
+            builder.append("Best visible: ").append(String.format("%.6f", best.value())).append(' ').append(best.kind()).append('\n');
+            builder.append("Fastest sample: ").append(best.row().getOrDefault("implementation", "")).append(" / ")
+                .append(best.row().getOrDefault("case_id", "")).append('\n');
+        }
+
+        builder.append("Filters: ")
+            .append(runImplementationFilter.getSelectedItem()).append(" / ")
+            .append(runCaseFilter.getSelectedItem()).append(" / ")
+            .append(runStatusFilter.getSelectedItem()).append('\n');
+        builder.append("Visible implementations: ").append(joinDistinct(filtered, "implementation")).append('\n');
+        builder.append("Visible cases: ").append(joinDistinct(filtered, "case_id")).append('\n');
+        builder.append("Timers: ").append(joinDistinct(filtered, "timer_kind")).append('\n');
+        runSummaryArea.setText(builder.toString());
     }
 
-    private void updateCharts(List<Map<String, String>> rows) {
+    private void renderLiveMonitorSnapshot(Map<String, String> liveEvent) {
+        if (liveEvent != null) {
+            StringBuilder builder = new StringBuilder();
+            int stepIndex = parseInt(liveEvent.get("step_index"));
+            int stepTotal = Math.max(1, parseInt(liveEvent.get("step_total")));
+            builder.append("Active profile: ").append(liveEvent.getOrDefault("profile_id", state.currentProfileId())).append('\n');
+            builder.append("Progress: ").append(stepIndex).append(" / ").append(stepTotal).append('\n');
+            builder.append("Phase: ").append(liveEvent.getOrDefault("phase", "")).append('\n');
+            if (!liveEvent.getOrDefault("implementation", "").isBlank()) {
+                builder.append("Implementation: ").append(liveEvent.get("implementation")).append('\n');
+            }
+            if (!liveEvent.getOrDefault("case_id", "").isBlank()) {
+                builder.append("Case: ").append(liveEvent.get("case_id")).append('\n');
+            }
+            if (!liveEvent.getOrDefault("timer_kind", "").isBlank()) {
+                builder.append("Timer: ").append(liveEvent.get("timer_kind")).append('\n');
+            }
+            if (!liveEvent.getOrDefault("metric", "").isBlank()) {
+                builder.append("Latest metric: ").append(liveEvent.get("metric")).append(' ').append(liveEvent.getOrDefault("metric_kind", "")).append('\n');
+            }
+            builder.append("Event stream: phase-boundary only").append('\n');
+            liveStatusArea.setText(builder.toString());
+            return;
+        }
+
+        if (state.currentRunId().isBlank()) {
+            liveStatusArea.setText("No run selected.\nStart a profile or pick a stored run.");
+            return;
+        }
+
+        List<Map<String, String>> events = state.runEvents().asMaps();
+        StringBuilder builder = new StringBuilder();
+        builder.append("Loaded run: ").append(state.currentRunId()).append('\n');
+        builder.append("Recorded events: ").append(events.size()).append('\n');
+        builder.append("Finished samples: ").append(countBy(events, "phase", "finished")).append('\n');
+        builder.append("Launch events: ").append(countBy(events, "phase", "launch")).append('\n');
+        if (!events.isEmpty()) {
+            Map<String, String> last = events.get(events.size() - 1);
+            builder.append("Last phase: ").append(last.getOrDefault("phase", "")).append('\n');
+            if (!last.getOrDefault("message", "").isBlank()) {
+                builder.append("Last message: ").append(last.get("message")).append('\n');
+            }
+        }
+        builder.append("Mode: controller-side monitoring only\n");
+        builder.append("No measured-loop UI callbacks or logging\n");
+        liveStatusArea.setText(builder.toString());
+    }
+
+    private void renderGlobalSummary(List<Map<String, String>> rows) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Tracked runs: ").append(state.runs().rows().size()).append('\n');
+        builder.append("Visible samples: ").append(rows.size()).append('\n');
+        builder.append("Visible profiles: ").append(joinDistinct(rows, "profile_id")).append('\n');
+        builder.append("Visible implementations: ").append(joinDistinct(rows, "implementation")).append('\n');
+        builder.append("Visible cases: ").append(joinDistinct(rows, "case_id")).append('\n');
+
+        MetricSample best = bestMetric(rows);
+        if (best != null) {
+            builder.append("Fastest visible sample: ").append(String.format("%.6f", best.value())).append(' ').append(best.kind()).append('\n');
+            builder.append("Location: ").append(best.row().getOrDefault("run_id", "")).append(" / ")
+                .append(best.row().getOrDefault("implementation", "")).append(" / ")
+                .append(best.row().getOrDefault("case_id", "")).append('\n');
+        }
+
+        Map<String, String> latest = firstNonBlank(state.runs().asMaps());
+        if (!latest.isEmpty()) {
+            builder.append("Latest tracked run: ").append(latest.getOrDefault("run_id", "")).append('\n');
+        }
+        builder.append("Scope: cross-run stored metrics only\n");
+        globalMonitorArea.setText(builder.toString());
+    }
+
+    private void updateRunCharts(List<Map<String, String>> rows) {
         Map<String, List<Double>> seriesMap = new LinkedHashMap<>();
-        Map<String, String> units = new LinkedHashMap<>();
         Map<String, Double> barValues = new LinkedHashMap<>();
+        String unit = "ns/iter";
+        int longest = 0;
 
         for (Map<String, String> row : rows) {
             Double metric = metric(row);
             if (metric == null) {
                 continue;
             }
-            String unit = metricKind(row);
+            unit = metricKind(row);
             String key = row.getOrDefault("implementation", "") + " · " + row.getOrDefault("case_id", "");
-            seriesMap.computeIfAbsent(key, ignored -> new ArrayList<>()).add(metric);
-            units.put(key, unit);
+            List<Double> values = seriesMap.computeIfAbsent(key, ignored -> new ArrayList<>());
+            values.add(metric);
+            longest = Math.max(longest, values.size());
             barValues.merge(row.getOrDefault("implementation", ""), metric, Math::min);
         }
 
@@ -692,31 +1014,111 @@ public final class ControllerFrame {
             series.add(new MetricLineChartPanel.Series(entry.getKey(), UiPalette.seriesColor(colorIndex), entry.getValue()));
             colorIndex += 1;
         }
-        String unit = seriesMap.isEmpty() ? "ns/iter" : units.values().iterator().next();
-        lineChart.setSeries(
-            currentRunId.isBlank() ? "Metric Trend" : "Metric Trend · " + currentRunId,
-            rows.isEmpty() ? "No data in the current filter." : "Repeat-level metrics rendered from stored result rows only.",
+
+        List<String> xLabels = new ArrayList<>();
+        for (int index = 1; index <= Math.max(1, longest); index += 1) {
+            xLabels.add("r" + index);
+        }
+        runLineChart.setSeries(
+            state.currentRunId().isBlank() ? "Run Metric Trend" : "Run Metric Trend · " + state.currentRunId(),
+            rows.isEmpty() ? "No stored result rows match the current run filter." : "Repeat-level metrics from the loaded run only.",
             unit,
+            "Repeat",
+            xLabels,
             series
         );
 
         List<ImplementationBarChartPanel.Bar> bars = new ArrayList<>();
-        int implementationColor = 0;
-        for (Map.Entry<String, Double> entry : barValues.entrySet()) {
-            bars.add(new ImplementationBarChartPanel.Bar(entry.getKey(), UiPalette.seriesColor(implementationColor), entry.getValue()));
-            implementationColor += 1;
+        colorIndex = 0;
+        for (Map.Entry<String, Double> entry : sortDoubleEntries(barValues)) {
+            bars.add(new ImplementationBarChartPanel.Bar(entry.getKey(), UiPalette.seriesColor(colorIndex), entry.getValue()));
+            colorIndex += 1;
         }
-        barChart.setBars("Best By Implementation", "Minimum visible metric for the current selection.", unit, bars);
+        runBarChart.setBars("Run Best By Implementation", "Fastest visible metric for the loaded run.", unit, bars);
     }
 
-    private void inspectSelectedResult() {
+    private void updateGlobalCharts(List<Map<String, String>> rows) {
+        Map<String, Double> bestByRun = new LinkedHashMap<>();
+        Map<String, List<Double>> implementationMetrics = new LinkedHashMap<>();
+        String unit = "ns/iter";
+
+        for (Map<String, String> row : rows) {
+            Double metric = metric(row);
+            if (metric == null) {
+                continue;
+            }
+            unit = metricKind(row);
+            bestByRun.merge(row.getOrDefault("run_id", ""), metric, Math::min);
+            implementationMetrics.computeIfAbsent(row.getOrDefault("implementation", ""), ignored -> new ArrayList<>()).add(metric);
+        }
+
+        List<Map<String, String>> orderedRuns = new ArrayList<>(state.runs().asMaps());
+        orderedRuns.sort(Comparator.comparingInt(row -> parseInt(row.get("run_number"))));
+        List<Double> runTrend = new ArrayList<>();
+        List<String> runLabels = new ArrayList<>();
+        for (Map<String, String> run : orderedRuns) {
+            String runId = run.getOrDefault("run_id", "");
+            if (!bestByRun.containsKey(runId)) {
+                continue;
+            }
+            runTrend.add(bestByRun.get(runId));
+            runLabels.add(shortRunLabel(run));
+        }
+
+        List<MetricLineChartPanel.Series> series = runTrend.isEmpty()
+            ? List.of()
+            : List.of(new MetricLineChartPanel.Series("Visible run best", UiPalette.ACCENT, runTrend));
+        globalLineChart.setSeries(
+            "Cross-Run Best Metric",
+            rows.isEmpty() ? "No stored metrics match the current global filter." : "One point per visible run using the fastest stored sample.",
+            unit,
+            "Run",
+            runLabels,
+            series
+        );
+
+        List<ImplementationBarChartPanel.Bar> bars = new ArrayList<>();
+        int colorIndex = 0;
+        List<Map.Entry<String, Double>> averages = new ArrayList<>();
+        for (Map.Entry<String, List<Double>> entry : implementationMetrics.entrySet()) {
+            double sum = 0.0;
+            for (double value : entry.getValue()) {
+                sum += value;
+            }
+            averages.add(Map.entry(entry.getKey(), sum / Math.max(1, entry.getValue().size())));
+        }
+        averages.sort(Map.Entry.comparingByValue());
+        for (Map.Entry<String, Double> entry : averages) {
+            bars.add(new ImplementationBarChartPanel.Bar(entry.getKey(), UiPalette.seriesColor(colorIndex), entry.getValue()));
+            colorIndex += 1;
+        }
+        globalBarChart.setBars("Cross-Run Average By Implementation", "Average visible metric across the current global filter.", unit, bars);
+    }
+
+    private void inspectSelectedRunResult() {
         int row = resultsTable.getSelectedRow();
         if (row < 0) {
             return;
         }
         int modelRow = resultsTable.convertRowIndexToModel(row);
-        Map<String, String> values = displayedResultsData.rowAsMap(modelRow);
+        inspectResult(state.filteredRunResults().rowAsMap(modelRow));
+    }
+
+    private void inspectSelectedGlobalResult() {
+        int row = globalResultsTable.getSelectedRow();
+        if (row < 0) {
+            return;
+        }
+        int modelRow = globalResultsTable.convertRowIndexToModel(row);
+        inspectResult(state.filteredGlobalResults().rowAsMap(modelRow));
+    }
+
+    private void inspectResult(Map<String, String> values) {
+        if (values.isEmpty()) {
+            return;
+        }
         detailArea.setText(formatDetail(values));
+        loadManifestForRun(values.getOrDefault("run_id", ""));
 
         String rawFile = values.getOrDefault("raw_file", values.getOrDefault("log_file", ""));
         if (rawFile.isBlank()) {
@@ -742,6 +1144,31 @@ public final class ControllerFrame {
         }.execute();
     }
 
+    private void loadManifestForRun(String runId) {
+        if (runId.isBlank()) {
+            return;
+        }
+        if (Objects.equals(runId, state.currentRunId()) && !state.runManifest().rows().isEmpty()) {
+            manifestArea.setText(formatKeyValueTable(state.runManifest()));
+            return;
+        }
+        new SwingWorker<TableData, Void>() {
+            @Override
+            protected TableData doInBackground() throws Exception {
+                return backend.readTable("manifest", runId);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    manifestArea.setText(formatKeyValueTable(get()));
+                } catch (Exception error) {
+                    manifestArea.setText("Unable to load manifest for " + runId + "\n" + error.getMessage());
+                }
+            }
+        }.execute();
+    }
+
     private void startRun() {
         String profileId = (String) profileSelector.getSelectedItem();
         if (profileId == null || profileId.isBlank()) {
@@ -751,16 +1178,19 @@ public final class ControllerFrame {
         runButton.setEnabled(false);
         refreshButton.setEnabled(false);
         docsButton.setEnabled(false);
+        workspaceTabs.setSelectedIndex(2);
         setStatus("Running " + profileId, UiPalette.INFO);
         progressBar.setValue(0);
         progressBar.setMaximum(100);
+        progressBar.setString("0 / 0");
         liveLogArea.setText("=== Launching " + profileId + " ===\n");
-        monitorArea.setText("Run in progress…\n");
+        liveStatusArea.setText("Waiting for controller events…\n");
         runEventHeaders = List.of();
         liveMetricRows.clear();
-        eventsData = TableData.empty();
-        pendingRunSelection = "";
+        state.setRunEvents(TableData.empty());
         applyTable(eventsModel, TableData.empty());
+        runLineChart.setSeries("Live Metric Trend", "Finished samples will appear here as the profile runs.", "ns/iter", "Repeat", List.of(), List.of());
+        runBarChart.setBars("Live Best By Implementation", "Controller-side view during the active run.", "ns/iter", List.of());
 
         new SwingWorker<Integer, Map<String, String>>() {
             @Override
@@ -797,8 +1227,9 @@ public final class ControllerFrame {
             @Override
             protected void done() {
                 activeProcess = null;
+                int exitCode = 1;
                 try {
-                    get();
+                    exitCode = get();
                 } catch (Exception error) {
                     liveLogArea.append("[run-error] " + error.getMessage() + "\n");
                 } finally {
@@ -807,8 +1238,10 @@ public final class ControllerFrame {
                     docsButton.setEnabled(true);
                     if (!pendingRunSelection.isBlank()) {
                         refreshAll();
-                    } else {
+                    } else if (exitCode == 0) {
                         setStatus("Run finished", UiPalette.SUCCESS);
+                    } else {
+                        setStatus("Run finished with issues", UiPalette.WARNING);
                     }
                 }
             }
@@ -818,23 +1251,27 @@ public final class ControllerFrame {
     private void handleLiveEvent(Map<String, String> event) {
         appendLiveLog(event);
         updateProgress(event);
+        renderLiveMonitorSnapshot(event);
         pushLiveEventTable(event);
         if ("finished".equals(event.get("phase"))) {
-            liveMetricRows.add(new LinkedHashMap<>(Map.of(
-                "implementation", event.getOrDefault("implementation", ""),
-                "case_id", event.getOrDefault("case_id", ""),
-                "repeat_index", event.getOrDefault("repeat_index", ""),
-                "warmup", event.getOrDefault("warmup", ""),
-                "ns_per_iteration", "ns/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "",
-                "legacy_cycles_per_iteration", "cycles/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "",
-                "status", event.getOrDefault("status", ""),
-                "timer_kind", event.getOrDefault("timer_kind", ""),
-                "elapsed_ns", event.getOrDefault("elapsed_ns", "")
-            )));
-            updateCharts(liveMetricRows);
+            Map<String, String> sample = new LinkedHashMap<>();
+            sample.put("run_id", event.getOrDefault("run_id", ""));
+            sample.put("profile_id", event.getOrDefault("profile_id", ""));
+            sample.put("implementation", event.getOrDefault("implementation", ""));
+            sample.put("case_id", event.getOrDefault("case_id", ""));
+            sample.put("repeat_index", event.getOrDefault("repeat_index", ""));
+            sample.put("warmup", event.getOrDefault("warmup", ""));
+            sample.put("ns_per_iteration", "ns/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "");
+            sample.put("legacy_cycles_per_iteration", "cycles/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "");
+            sample.put("status", event.getOrDefault("status", ""));
+            sample.put("timer_kind", event.getOrDefault("timer_kind", ""));
+            sample.put("elapsed_ns", event.getOrDefault("elapsed_ns", ""));
+            liveMetricRows.add(sample);
+            updateRunCharts(liveMetricRows);
         }
         if ("completed".equals(event.get("phase"))) {
             pendingRunSelection = event.getOrDefault("run_id", "");
+            state.setCurrentRunId(pendingRunSelection);
             setStatus("Run complete: " + pendingRunSelection, UiPalette.SUCCESS);
         }
     }
@@ -867,54 +1304,19 @@ public final class ControllerFrame {
         int progress = (int) Math.round((stepIndex * 100.0) / stepTotal);
         progressBar.setValue(progress);
         progressBar.setString(stepIndex + " / " + stepTotal);
-        progressBar.setStringPainted(true);
-        StringBuilder builder = new StringBuilder();
-        builder.append("Active profile: ").append(event.getOrDefault("profile_id", currentProfileId)).append('\n');
-        builder.append("Progress: ").append(stepIndex).append(" / ").append(stepTotal).append('\n');
-        builder.append("Phase: ").append(event.getOrDefault("phase", "")).append('\n');
-        if (!event.getOrDefault("implementation", "").isBlank()) {
-            builder.append("Implementation: ").append(event.get("implementation")).append('\n');
-        }
-        if (!event.getOrDefault("case_id", "").isBlank()) {
-            builder.append("Case: ").append(event.get("case_id")).append('\n');
-        }
-        if (!event.getOrDefault("timer_kind", "").isBlank()) {
-            builder.append("Timer: ").append(event.get("timer_kind")).append('\n');
-        }
-        if (!event.getOrDefault("metric", "").isBlank()) {
-            builder.append("Latest metric: ").append(event.get("metric")).append(' ').append(event.getOrDefault("metric_kind", "")).append('\n');
-        }
-        monitorArea.setText(builder.toString());
     }
 
     private void pushLiveEventTable(Map<String, String> event) {
-        List<Map<String, String>> rows = eventsData.asMaps().isEmpty() ? new ArrayList<>() : new ArrayList<>(eventsData.asMaps());
+        List<Map<String, String>> rows = new ArrayList<>(state.runEvents().asMaps());
         rows.add(event);
-        eventsData = mapsToTableData(rows, List.of(
-            "event_type",
-            "phase",
-            "run_id",
-            "profile_id",
-            "implementation",
-            "case_id",
-            "repeat_index",
-            "warmup",
-            "status",
-            "metric",
-            "metric_kind",
-            "elapsed_ns",
-            "timer_kind",
-            "step_index",
-            "step_total",
-            "message"
-        ));
-        applyTable(eventsModel, eventsData);
+        state.setRunEvents(mapsToTableData(rows, LIVE_EVENT_HEADERS));
+        applyTable(eventsModel, state.runEvents());
     }
 
-    private void setStatus(String text, java.awt.Color color) {
+    private void setStatus(String text, Color color) {
         statusPill.setText(text);
         statusPill.setBackground(color);
-        statusPill.setForeground(color.equals(UiPalette.ACCENT) || color.equals(UiPalette.WARNING) ? UiPalette.WINDOW : UiPalette.WINDOW);
+        statusPill.setForeground(brightBackground(color) ? UiPalette.WINDOW : UiPalette.TEXT);
     }
 
     private void showDocument(String title, Path relativePath) {
@@ -928,12 +1330,17 @@ public final class ControllerFrame {
             JDialog dialog = new JDialog(frame, title, false);
             dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
             dialog.add(scrollPane);
-            dialog.setSize(900, 720);
+            dialog.setSize(Math.max(900, frame.getWidth() - 240), Math.max(720, frame.getHeight() - 180));
             dialog.setLocationRelativeTo(frame);
             dialog.setVisible(true);
         } catch (IOException error) {
             JOptionPane.showMessageDialog(frame, "Unable to open " + relativePath + "\n" + error.getMessage(), title, JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private static boolean brightBackground(Color color) {
+        double luminance = (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue()) / 255.0;
+        return luminance > 0.55;
     }
 
     private static void applyTable(DefaultTableModel model, TableData data) {
@@ -992,6 +1399,7 @@ public final class ControllerFrame {
 
     private static String formatDetail(Map<String, String> values) {
         StringBuilder builder = new StringBuilder();
+        builder.append(values.getOrDefault("run_id", "")).append('\n');
         builder.append(values.getOrDefault("implementation", "")).append(" / ").append(values.getOrDefault("case_id", "")).append('\n');
         builder.append("status: ").append(values.getOrDefault("status", "")).append('\n');
         builder.append("warmup: ").append(values.getOrDefault("warmup", "")).append('\n');
@@ -1004,6 +1412,7 @@ public final class ControllerFrame {
         builder.append("ns_per_add: ").append(values.getOrDefault("ns_per_add", "")).append('\n');
         builder.append("legacy_cycles: ").append(values.getOrDefault("legacy_cycles", "")).append('\n');
         builder.append("legacy_cycles_per_iteration: ").append(values.getOrDefault("legacy_cycles_per_iteration", "")).append('\n');
+        builder.append("legacy_cycles_per_add: ").append(values.getOrDefault("legacy_cycles_per_add", "")).append('\n');
         builder.append("runtime: ").append(values.getOrDefault("runtime_name", "")).append(" (").append(values.getOrDefault("runtime_source", "")).append(")\n");
         builder.append("pid/tid: ").append(values.getOrDefault("pid", "")).append(" / ").append(values.getOrDefault("tid", "")).append('\n');
         builder.append("scheduler: ")
@@ -1015,6 +1424,78 @@ public final class ControllerFrame {
         builder.append("checksum: ").append(values.getOrDefault("result_checksum", "")).append('\n');
         builder.append("platform_extras_json: ").append(values.getOrDefault("platform_extras_json", "")).append('\n');
         return builder.toString();
+    }
+
+    private static MetricSample bestMetric(List<Map<String, String>> rows) {
+        MetricSample best = null;
+        for (Map<String, String> row : rows) {
+            Double value = metric(row);
+            if (value == null) {
+                continue;
+            }
+            MetricSample sample = new MetricSample(row, value, metricKind(row));
+            if (best == null || value < best.value()) {
+                best = sample;
+            }
+        }
+        return best;
+    }
+
+    private static String joinDistinct(List<Map<String, String>> rows, String key) {
+        Set<String> values = new LinkedHashSet<>();
+        for (Map<String, String> row : rows) {
+            String value = row.getOrDefault(key, "");
+            if (!value.isBlank()) {
+                values.add(value);
+            }
+        }
+        if (values.isEmpty()) {
+            return "n/a";
+        }
+        return String.join(", ", values);
+    }
+
+    private static int countBy(List<Map<String, String>> rows, String key, String value) {
+        int count = 0;
+        for (Map<String, String> row : rows) {
+            if (Objects.equals(value, row.get(key))) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    private static Map<String, String> findRow(List<Map<String, String>> rows, String key, String value) {
+        for (Map<String, String> row : rows) {
+            if (Objects.equals(value, row.get(key))) {
+                return row;
+            }
+        }
+        return Map.of();
+    }
+
+    private static Map<String, String> firstNonBlank(List<Map<String, String>> rows) {
+        for (Map<String, String> row : rows) {
+            if (!row.isEmpty()) {
+                return row;
+            }
+        }
+        return Map.of();
+    }
+
+    private static String shortRunLabel(Map<String, String> row) {
+        String runNumber = row.getOrDefault("run_number", "");
+        String profile = row.getOrDefault("profile_id", "");
+        if (!runNumber.isBlank()) {
+            return "r" + runNumber + " " + profile;
+        }
+        return row.getOrDefault("run_id", "");
+    }
+
+    private static List<Map.Entry<String, Double>> sortDoubleEntries(Map<String, Double> values) {
+        List<Map.Entry<String, Double>> entries = new ArrayList<>(values.entrySet());
+        entries.sort(Map.Entry.comparingByValue());
+        return entries;
     }
 
     private static int parseInt(String value) {
@@ -1041,4 +1522,6 @@ public final class ControllerFrame {
         return !row.getOrDefault("ns_per_iteration", "").isBlank() ? "ns/iter" : "cycles/iter";
     }
 
+    private record MetricSample(Map<String, String> row, double value, String kind) {
+    }
 }
