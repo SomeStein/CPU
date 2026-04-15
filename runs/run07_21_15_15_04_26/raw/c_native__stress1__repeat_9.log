@@ -1,7 +1,0 @@
-[command]
-/Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/bin/macos-arm64/c_native --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/c_native__stress1__repeat_9.case
-
-[stdout]
-{"schema_version":1,"implementation":"c_native","language":"c","variant":"native","case_id":"stress1","warmup":false,"repeat_index":9,"iterations":10000,"parallel_chains":1,"loop_trip_count":10000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":36000,"ns_per_iteration":3.600000,"ns_per_add":1.800000,"result_checksum":"14072392958797158149","host_os":"macos","host_arch":"arm64","pid":44775,"tid":8235830272,"requested_priority_mode":"high","requested_affinity_mode":"unchanged","applied_priority_mode":"unsupported","applied_affinity_mode":"unchanged","scheduler_notes":"best-effort scheduler controls unavailable on this host","runtime_name":"c_native","platform_extras":{"counter_frequency":0}}
-
-[stderr]

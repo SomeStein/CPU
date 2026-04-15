@@ -1,7 +1,0 @@
-[command]
-/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python_sloppy.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/python_sloppy__stress2__repeat_19.case
-
-[stdout]
-{"applied_affinity_mode": "unchanged", "applied_priority_mode": "unsupported", "case_id": "stress2", "elapsed_ns": 30920333, "host_arch": "arm64", "host_os": "macos", "implementation": "python_sloppy", "iterations": 100000, "language": "python", "loop_trip_count": 100000, "ns_per_add": 154.601665, "ns_per_iteration": 309.20333, "parallel_chains": 1, "pid": 49109, "platform_extras": {}, "remainder": 0, "repeat_index": 19, "requested_affinity_mode": "unchanged", "requested_priority_mode": "high", "result_checksum": "17535537585013354437", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable", "schema_version": 1, "tid": 20829816, "timer_kind": "perf_counter_ns", "variant": "sloppy", "warmup": false}
-
-[stderr]

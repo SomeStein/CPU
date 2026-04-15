@@ -68,8 +68,8 @@ finish = BenchmarkCommon.monotonic_ns
 
 BenchmarkCommon.emit_result(
   BenchmarkCommon.build_result(
-    implementation: "ruby_optimized",
-    variant: "optimized",
+    implementation: "ruby",
+    variant: "default",
     case_data: case_data,
     context: context,
     elapsed_ns: finish - start,

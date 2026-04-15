@@ -76,8 +76,8 @@ my $finish = monotonic_ns();
 
 emit_result(
   build_result(
-    implementation => "perl_optimized",
-    variant => "optimized",
+    implementation => "perl",
+    variant => "default",
     case_data => $case_data,
     context => $context,
     elapsed_ns => ($finish - $start),

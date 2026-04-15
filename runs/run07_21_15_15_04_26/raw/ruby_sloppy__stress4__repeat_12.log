@@ -1,7 +1,0 @@
-[command]
-/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby_sloppy.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/ruby_sloppy__stress4__repeat_12.case
-
-[stdout]
-{"schema_version":1,"implementation":"ruby_sloppy","language":"ruby","variant":"sloppy","case_id":"stress4","warmup":false,"repeat_index":12,"iterations":10000000,"parallel_chains":4,"loop_trip_count":2500000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":4548944000,"ns_per_iteration":454.8944,"ns_per_add":227.4472,"result_checksum":"2114941700197524897","host_os":"macos","host_arch":"arm64","pid":54252,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"unchanged","applied_priority_mode":"unsupported","applied_affinity_mode":"unchanged","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only","runtime_name":"ruby","platform_extras":{}}
-
-[stderr]

@@ -1,7 +1,0 @@
-[command]
-/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby_optimized.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/ruby_optimized__stress5__repeat_10.case
-
-[stdout]
-{"schema_version":1,"implementation":"ruby_optimized","language":"ruby","variant":"optimized","case_id":"stress5","warmup":false,"repeat_index":10,"iterations":100000000,"parallel_chains":4,"loop_trip_count":25000000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":28416023000,"ns_per_iteration":284.16023,"ns_per_add":142.080115,"result_checksum":"421144082892076065","host_os":"macos","host_arch":"arm64","pid":51858,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"unchanged","applied_priority_mode":"unsupported","applied_affinity_mode":"unchanged","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only","runtime_name":"ruby","platform_extras":{}}
-
-[stderr]

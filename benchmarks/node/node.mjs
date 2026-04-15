@@ -76,7 +76,7 @@ const end = process.hrtime.bigint();
 
 emitResult(
   buildResult({
-    implementation: "node_optimized",
+    implementation: "node",
     caseData,
     context,
     elapsedNs: end - start,

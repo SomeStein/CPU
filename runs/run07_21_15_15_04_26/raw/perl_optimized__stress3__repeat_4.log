@@ -1,8 +1,0 @@
-[command]
-/usr/bin/perl /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/perl_optimized.pl --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/perl_optimized__stress3__repeat_4.case
-
-[stdout]
-{"host_arch":"unknown","ns_per_iteration":684.451001,"host_os":"macos","parallel_chains":1,"pid":45544,"ns_per_add":342.2255005,"elapsed_ns":684451001,"applied_affinity_mode":"unchanged","iterations":1000000,"requested_affinity_mode":"unchanged","loop_trip_count":1000000,"applied_priority_mode":"unsupported","platform_extras":{},"warmup":false,"tid":0,"language":"perl","remainder":0,"case_id":"stress3","scheduler_notes":"Perl runtime uses controller-side best effort scheduling only","timer_kind":"clock_gettime_ns","repeat_index":4,"result_checksum":"0","variant":"optimized","runtime_name":"perl","implementation":"perl_optimized","requested_priority_mode":"high","schema_version":1}
-
-[stderr]
-Hexadecimal number > 0xffffffff non-portable at /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/BenchmarkCommon.pm line 19.

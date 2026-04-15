@@ -73,37 +73,37 @@ if sys.platform == "win32":
     BOOL = ctypes.c_int
     HANDLE = ctypes.c_void_p
     DWORD_PTR = ctypes.c_size_t
+    HIGH_PRIORITY_CLASS = 0x00000080
 
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.GetCurrentProcessId.restype = DWORD
     kernel32.GetCurrentThreadId.restype = DWORD
-    kernel32.GetCurrentThread.restype = HANDLE
-    kernel32.SetThreadPriority.argtypes = [HANDLE, ctypes.c_int]
-    kernel32.SetThreadPriority.restype = BOOL
-    kernel32.SetThreadAffinityMask.argtypes = [HANDLE, DWORD_PTR]
-    kernel32.SetThreadAffinityMask.restype = DWORD_PTR
+    kernel32.GetCurrentProcess.restype = HANDLE
+    kernel32.SetPriorityClass.argtypes = [HANDLE, DWORD]
+    kernel32.SetPriorityClass.restype = BOOL
+    kernel32.SetProcessAffinityMask.argtypes = [HANDLE, DWORD_PTR]
+    kernel32.SetProcessAffinityMask.restype = BOOL
 
 
 def _windows_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
-    thread = kernel32.GetCurrentThread()
+    process = kernel32.GetCurrentProcess()
     applied_priority = "unchanged"
     applied_affinity = "unchanged"
     notes: list[str] = []
 
     if priority_mode == "high":
-        if kernel32.SetThreadPriority(thread, 2):
+        if kernel32.SetPriorityClass(process, HIGH_PRIORITY_CLASS):
             applied_priority = "high"
         else:
             applied_priority = "failed"
-            notes.append("SetThreadPriority failed")
+            notes.append("SetPriorityClass failed")
 
     if affinity_mode == "single_core":
-        previous = kernel32.SetThreadAffinityMask(thread, 1)
-        if previous:
+        if kernel32.SetProcessAffinityMask(process, DWORD_PTR(1)):
             applied_affinity = "single_core"
         else:
             applied_affinity = "failed"
-            notes.append("SetThreadAffinityMask failed")
+            notes.append("SetProcessAffinityMask failed")
 
     return {
         "pid": int(kernel32.GetCurrentProcessId()),
@@ -117,6 +117,7 @@ def _windows_context(priority_mode: str, affinity_mode: str) -> dict[str, object
 
 
 def _posix_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
+    is_macos = sys.platform == "darwin"
     applied_priority = "unchanged"
     notes: list[str] = []
 
@@ -125,12 +126,17 @@ def _posix_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
             os.nice(-5)
             applied_priority = "high"
         except (AttributeError, PermissionError, OSError):
-            applied_priority = "unsupported"
+            applied_priority = "advisory_macos" if is_macos else "unsupported"
             notes.append("priority elevation unavailable")
 
-    applied_affinity = "unsupported" if affinity_mode == "single_core" else "unchanged"
     if affinity_mode == "single_core":
-        notes.append("affinity control unavailable")
+        applied_affinity = "advisory_macos" if is_macos else "unsupported"
+        if is_macos:
+            notes.append("macos: affinity advisory (apple silicon does not honor pinning)")
+        else:
+            notes.append("affinity control unavailable")
+    else:
+        applied_affinity = "unchanged"
 
     return {
         "pid": os.getpid(),

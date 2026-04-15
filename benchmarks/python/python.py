@@ -79,7 +79,7 @@ def main() -> int:
 
     emit_result_json(
         build_result(
-            implementation="python_optimized",
+            implementation="python",
             case=case,
             context=context,
             elapsed_ns=end - start,

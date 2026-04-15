@@ -27,8 +27,8 @@ fn main() {
     println!(
         "{}",
         build_result(
-            "rust_optimized",
-            "optimized",
+            "rust",
+            "default",
             &case_data,
             loop_trip_count,
             remainder,

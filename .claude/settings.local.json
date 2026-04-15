@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls benchmarks/*/)",
+      "Bash(rm -rf runs/)",
+      "Bash(mkdir -p runs)",
+      "Bash(touch runs/.gitkeep)",
+      "Bash(rm -f tools/bin/macos-arm64/c_native)",
+      "Bash(rm -f testruns/polyglot_smoke.testrun.json testruns/polyglot_balanced.testrun.json)"
+    ]
+  }
+}

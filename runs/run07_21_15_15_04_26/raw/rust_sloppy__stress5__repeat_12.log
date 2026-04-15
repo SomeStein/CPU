@@ -1,2 +1,0 @@
-[command-error]
-Missing native benchmark binary for rust_sloppy. Expected tools/bin/macos-arm64/rust_sloppy.

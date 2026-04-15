@@ -83,8 +83,8 @@ int main(int argc, char** argv) {
     std::uint64_t finish = monotonic_ns();
 
     ResultPayload payload;
-    payload.implementation = "cpp_optimized";
-    payload.variant = "optimized";
+    payload.implementation = "cpp";
+    payload.variant = "default";
     payload.case_data = case_data;
     payload.context = context;
     payload.loop_trip_count = loop_trip_count;

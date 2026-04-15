@@ -73,7 +73,7 @@ func main() {
 		checksum = runEight(loopTripCount, remainder)
 	}
 	elapsed := time.Since(start).Nanoseconds()
-	payload := buildResult("go_optimized", "optimized", data, loopTripCount, remainder, elapsed, checksum)
+	payload := buildResult("go", "default", data, loopTripCount, remainder, elapsed, checksum)
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetEscapeHTML(false)
 	_ = encoder.Encode(payload)

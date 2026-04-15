@@ -1,2 +1,0 @@
-[command-error]
-Missing native benchmark binary for cpp_optimized. Expected tools/bin/macos-arm64/cpp_optimized.

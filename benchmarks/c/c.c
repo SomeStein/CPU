@@ -76,7 +76,7 @@ static bool parse_case_file(const char *path, CaseData *case_data) {
     }
 
     memset(case_data, 0, sizeof(*case_data));
-    copy_value(case_data->implementation, sizeof(case_data->implementation), "c_native");
+    copy_value(case_data->implementation, sizeof(case_data->implementation), "c");
     copy_value(case_data->priority_mode, sizeof(case_data->priority_mode), "high");
     copy_value(case_data->affinity_mode, sizeof(case_data->affinity_mode), "single_core");
 
@@ -138,7 +138,7 @@ static uint64_t monotonic_ns(Context *context) {
 
 static Context prepare_context(const CaseData *case_data) {
     Context context;
-    HANDLE thread = GetCurrentThread();
+    HANDLE process = GetCurrentProcess();
     context.pid = (uint64_t)GetCurrentProcessId();
     context.tid = (uint64_t)GetCurrentThreadId();
     context.requested_priority_mode = case_data->priority_mode;
@@ -150,21 +150,20 @@ static Context prepare_context(const CaseData *case_data) {
     context.timer_kind = "qpc_ns";
 
     if (strcmp(case_data->priority_mode, "high") == 0) {
-        if (SetThreadPriority(thread, THREAD_PRIORITY_HIGHEST)) {
+        if (SetPriorityClass(process, HIGH_PRIORITY_CLASS)) {
             context.applied_priority_mode = "high";
         } else {
             context.applied_priority_mode = "failed";
-            context.scheduler_notes = "SetThreadPriority failed";
+            context.scheduler_notes = "SetPriorityClass failed";
         }
     }
 
     if (strcmp(case_data->affinity_mode, "single_core") == 0) {
-        DWORD_PTR previous_mask = SetThreadAffinityMask(thread, 1);
-        if (previous_mask != 0) {
+        if (SetProcessAffinityMask(process, (DWORD_PTR)1)) {
             context.applied_affinity_mode = "single_core";
         } else {
             context.applied_affinity_mode = "failed";
-            context.scheduler_notes = "SetThreadAffinityMask failed";
+            context.scheduler_notes = "SetProcessAffinityMask failed";
         }
     }
     return context;
@@ -189,9 +188,9 @@ static Context prepare_context(const CaseData *case_data) {
     context.tid = tid;
     context.requested_priority_mode = case_data->priority_mode;
     context.requested_affinity_mode = case_data->affinity_mode;
-    context.applied_priority_mode = strcmp(case_data->priority_mode, "high") == 0 ? "unsupported" : "unchanged";
-    context.applied_affinity_mode = strcmp(case_data->affinity_mode, "single_core") == 0 ? "unsupported" : "unchanged";
-    context.scheduler_notes = "best-effort scheduler controls unavailable on this host";
+    context.applied_priority_mode = strcmp(case_data->priority_mode, "high") == 0 ? "advisory_macos" : "unchanged";
+    context.applied_affinity_mode = strcmp(case_data->affinity_mode, "single_core") == 0 ? "advisory_macos" : "unchanged";
+    context.scheduler_notes = "macos: affinity/priority are advisory (apple silicon does not honor pinning)";
     context.extra_value = 0;
     context.timer_kind = "clock_gettime_ns";
     return context;
@@ -282,7 +281,7 @@ int main(int argc, char **argv) {
     double ns_per_add;
 
     if (argc != 3 || strcmp(argv[1], "--case-file") != 0) {
-        fprintf(stderr, "Usage: c_native --case-file <path>\n");
+        fprintf(stderr, "Usage: c --case-file <path>\n");
         return 1;
     }
 
@@ -312,9 +311,9 @@ int main(int argc, char **argv) {
     printf(
         "{"
         "\"schema_version\":1,"
-        "\"implementation\":\"c_native\","
+        "\"implementation\":\"c\","
         "\"language\":\"c\","
-        "\"variant\":\"native\","
+        "\"variant\":\"default\","
         "\"case_id\":\"%s\","
         "\"warmup\":%s,"
         "\"repeat_index\":%" PRIu64 ","
@@ -336,7 +335,7 @@ int main(int argc, char **argv) {
         "\"applied_priority_mode\":\"%s\","
         "\"applied_affinity_mode\":\"%s\","
         "\"scheduler_notes\":\"%s\","
-        "\"runtime_name\":\"c_native\","
+        "\"runtime_name\":\"c\","
         "\"platform_extras\":{\"counter_frequency\":%" PRIu64 "}"
         "}\n",
         case_data.case_id,

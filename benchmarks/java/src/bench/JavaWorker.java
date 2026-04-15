@@ -1,7 +1,7 @@
 package bench;
 
-public final class JavaOptimized {
-    private JavaOptimized() {
+public final class JavaWorker {
+    private JavaWorker() {
     }
 
     public static void main(String[] args) throws Exception {
@@ -24,8 +24,8 @@ public final class JavaOptimized {
         System.out.println(
             BenchCommon.toJson(
                 new BenchCommon.ResultPayload(
-                    "java_optimized",
-                    "optimized",
+                    "java",
+                    "default",
                     caseData,
                     context,
                     loopTripCount,
