@@ -2,17 +2,18 @@
 
 ## Top-Level Shape
 
-The repository is split into five layers.
+The repository is split into six layers.
 
-1. Launch and task entrypoints
+1. Launch entrypoints
 2. Python orchestration backend
-3. Language-specific benchmark workers
-4. Java Swing controller UI
-5. Tracked run history and saved profiles
+3. Saved profile store
+4. Language-specific benchmark workers
+5. Swing launch deck
+6. Tracked run history
 
 ## Launch Layer
 
-Primary launch files:
+Primary entrypoints:
 
 - [`scripts/launcher.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/launcher.py)
 - [`scripts/run-task.sh`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/run-task.sh)
@@ -22,8 +23,9 @@ Primary launch files:
 Responsibilities:
 
 - resolve host entrypoints
-- build Java classes and host-native C benchmark binaries
-- start headless runs
+- build Java classes for the UI and Java benchmarks
+- compile host-native benchmark binaries when local toolchains are available
+- prefer repo-bundled runtimes and binaries
 - launch the Swing controller
 
 ## Python Backend
@@ -33,6 +35,8 @@ The Python layer is the orchestration and analysis boundary.
 Key modules:
 
 - [`scripts/benchkit/common.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/common.py)
+- [`scripts/benchkit/catalog.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/catalog.py)
+- [`scripts/benchkit/profiles.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/profiles.py)
 - [`scripts/benchkit/build.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/build.py)
 - [`scripts/benchkit/runtimes.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/runtimes.py)
 - [`scripts/benchkit/suite.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/benchkit/suite.py)
@@ -41,86 +45,94 @@ Key modules:
 
 Responsibilities:
 
-- host detection
-- runtime resolution
-- profile loading
-- case expansion
-- worker execution
-- result normalization
-- run artifact persistence
+- host detection and path resolution
+- implementation catalog and runtime lookup
+- built-in and custom profile discovery
+- draft validation and custom profile saving
+- case expansion and worker execution
+- result normalization and persistence
 - legacy history import
-- UI backend commands
+- backend commands consumed by the Swing UI
+
+## Profile Store
+
+Profile files use one stable `.testrun.json` schema:
+
+- `schema_version`
+- `id`
+- `name`
+- `implementations`
+- `defaults`
+- `matrix`
+
+Storage locations:
+
+- built-in profiles: [`testruns/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns>)
+- custom profiles: [`testruns/custom/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns/custom>)
+
+Rules:
+
+- built-in profiles are read-only templates
+- custom profiles are persisted through the backend
+- temporary drafts can be run without being saved
 
 ## Worker Layer
 
-Workers are intentionally thin and silent during measurement.
+Workers are grouped by language under [`benchmarks/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks>).
 
-Python:
+Implemented source groups:
 
-- [`scripts/python_sloppy.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/python_sloppy.py)
-- [`scripts/python_optimized.py`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/python_optimized.py)
+- C: [`benchmarks/c/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/c>)
+- C++: [`benchmarks/cpp/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/cpp>)
+- Go: [`benchmarks/go/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/go>)
+- Java: [`benchmarks/java/src/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/java/src>)
+- Node: [`benchmarks/node/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/node>)
+- Perl: [`benchmarks/perl/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl>)
+- Python: [`benchmarks/python/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python>)
+- Ruby: [`benchmarks/ruby/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby>)
+- Rust: [`benchmarks/rust/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/rust>)
 
-Node:
+Worker contract:
 
-- [`scripts/node_benchmark_common.mjs`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/node_benchmark_common.mjs)
-- [`scripts/node_sloppy.mjs`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/node_sloppy.mjs)
-- [`scripts/node_optimized.mjs`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/node_optimized.mjs)
-
-Java:
-
-- [`java-src/bench/BenchCommon.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/java-src/bench/BenchCommon.java)
-- [`java-src/bench/JavaSloppy.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/java-src/bench/JavaSloppy.java)
-- [`java-src/bench/JavaOptimized.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/java-src/bench/JavaOptimized.java)
-
-C:
-
-- [`tsc_benchmark.c`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/tsc_benchmark.c)
-
-Contract:
-
-- input comes from `--case-file`
+- input comes from `--case-file <path>`
 - output is one final JSON result
-- no progress output from the timed section
+- no progress output is allowed inside the measured region
+- scheduler notes and platform extras are optional metadata only
 
-## Controller UI
+## Swing Launch Deck
 
-The controller is now modular.
+The GUI now lives under [`gui/src/cpubench/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/gui/src/cpubench>).
 
 Main classes:
 
-- [`controller/src/cpubench/ControllerApp.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ControllerApp.java)
-- [`controller/src/cpubench/api/BackendClient.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/api/BackendClient.java)
-- [`controller/src/cpubench/model/TableData.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/model/TableData.java)
-- [`controller/src/cpubench/ui/ControllerFrame.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ui/ControllerFrame.java)
-- [`controller/src/cpubench/ui/DarkTheme.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ui/DarkTheme.java)
-- [`controller/src/cpubench/ui/IconFactory.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ui/IconFactory.java)
-- [`controller/src/cpubench/ui/MetricLineChartPanel.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ui/MetricLineChartPanel.java)
-- [`controller/src/cpubench/ui/ImplementationBarChartPanel.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ui/ImplementationBarChartPanel.java)
+- [`gui/src/cpubench/ControllerApp.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ControllerApp.java)
+- [`gui/src/cpubench/api/BackendClient.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/api/BackendClient.java)
+- [`gui/src/cpubench/model/ControllerState.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/model/ControllerState.java)
+- [`gui/src/cpubench/model/ProfileDraft.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/model/ProfileDraft.java)
+- [`gui/src/cpubench/ui/ControllerFrame.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/ControllerFrame.java)
+- [`gui/src/cpubench/ui/ProfileBuilderPanel.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/ProfileBuilderPanel.java)
+- [`gui/src/cpubench/ui/DarkTheme.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/DarkTheme.java)
 
 Responsibilities:
 
-- present the run deck
-- expose saved profiles
-- stream live launch/finish events
-- render graphs from stored results or live controller-side event summaries
-- inspect raw logs and manifest data
-- expose repository docs inside the app
+- present the launch deck and history browser
+- expose built-in and custom profiles
+- provide the custom run builder
+- stream phase-boundary events during active runs
+- render run and global charts from persisted metrics
+- inspect raw logs, manifests, and documentation
 
 ## Data Flow
 
-1. A profile is selected in the UI or via CLI.
-2. The Python suite expands that profile into case files.
-3. Each worker is started as a separate process.
-4. The worker returns exactly one JSON payload.
-5. The suite writes result rows and raw logs after the process exits.
-6. The suite emits controller-side events before launch and after completion.
-7. The UI reads runs, results, events, manifests, and logs through `controller_api.py`.
+1. A saved or temporary profile is selected in the GUI.
+2. The Python suite validates the profile definition.
+3. The suite expands the profile into case files.
+4. Each implementation runs as an isolated worker process.
+5. The worker emits exactly one final JSON payload.
+6. The suite writes raw logs, result rows, and phase-boundary events after process exit.
+7. The GUI reloads stored runs, results, events, and manifests through `controller_api.py`.
 
 ## Persisted Formats
-
-Profile files:
-
-- [`testruns/*.testrun.json`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns>)
 
 Per-run files:
 
@@ -134,3 +146,4 @@ Global index:
 
 - [`runs/index.csv`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/runs/index.csv)
 
+The history layer must remain compatible with legacy runs that predate the current schema.

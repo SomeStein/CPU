@@ -37,6 +37,20 @@ def _tool_candidates(name: str) -> list[Path]:
                 runtime_dir / "node" / "bin" / "node",
             ]
         )
+    elif name == "ruby":
+        candidates.extend(
+            [
+                runtime_dir / "ruby" / "ruby.exe",
+                runtime_dir / "ruby" / "bin" / "ruby",
+            ]
+        )
+    elif name == "perl":
+        candidates.extend(
+            [
+                runtime_dir / "perl" / "perl.exe",
+                runtime_dir / "perl" / "bin" / "perl",
+            ]
+        )
     elif name == "java":
         candidates.extend(
             [
@@ -53,6 +67,20 @@ def _tool_candidates(name: str) -> list[Path]:
                 runtime_dir / "java" / "bin" / "javac",
                 runtime_dir / "jdk" / "bin" / "javac.exe",
                 runtime_dir / "jdk" / "bin" / "javac",
+            ]
+        )
+    elif name == "go":
+        candidates.extend(
+            [
+                runtime_dir / "go" / "bin" / "go.exe",
+                runtime_dir / "go" / "bin" / "go",
+            ]
+        )
+    elif name == "rustc":
+        candidates.extend(
+            [
+                runtime_dir / "rust" / "bin" / "rustc.exe",
+                runtime_dir / "rust" / "bin" / "rustc",
             ]
         )
     return candidates
@@ -77,4 +105,3 @@ def resolve_tool(name: str, *, required: bool = True) -> ResolvedTool:
     raise FileNotFoundError(
         f"Could not resolve '{name}'. Add a bundled runtime under {runtime_dir} or install it on PATH."
     )
-

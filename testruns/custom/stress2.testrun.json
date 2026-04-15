@@ -1,0 +1,58 @@
+{
+  "defaults": {
+    "affinity_mode": "unchanged",
+    "priority_mode": "high",
+    "repeats": 20,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "stress2",
+  "implementations": [
+    "c_native",
+    "cpp_optimized",
+    "cpp_sloppy",
+    "go_optimized",
+    "go_sloppy",
+    "java_optimized",
+    "java_sloppy",
+    "node_optimized",
+    "node_sloppy",
+    "perl_optimized",
+    "perl_sloppy",
+    "python_optimized",
+    "python_sloppy",
+    "ruby_optimized",
+    "ruby_sloppy",
+    "rust_optimized",
+    "rust_sloppy"
+  ],
+  "matrix": [
+    {
+      "case_id": "stress1",
+      "iterations": 10000,
+      "parallel_chains": 1
+    },
+    {
+      "case_id": "stress2",
+      "iterations": 100000,
+      "parallel_chains": 1
+    },
+    {
+      "case_id": "stress3",
+      "iterations": 1000000,
+      "parallel_chains": 1
+    },
+    {
+      "case_id": "stress4",
+      "iterations": 10000000,
+      "parallel_chains": 4
+    },
+    {
+      "case_id": "stress5",
+      "iterations": 100000000,
+      "parallel_chains": 4
+    }
+  ],
+  "name": "Stress2",
+  "schema_version": 1
+}

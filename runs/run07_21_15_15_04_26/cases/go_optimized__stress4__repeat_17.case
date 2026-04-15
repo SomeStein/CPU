@@ -1,0 +1,11 @@
+run_id=run07_21_15_15_04_26
+profile_id=stress2
+implementation=go_optimized
+case_id=stress4
+iterations=10000000
+parallel_chains=4
+priority_mode=high
+affinity_mode=unchanged
+timer_mode=monotonic_ns
+warmup=false
+repeat_index=17

@@ -1,0 +1,15 @@
+[command]
+/usr/bin/perl /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/perl_optimized.pl --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run06_20_46_15_04_26/cases/perl_optimized__quick_single__warmup_1.case
+
+[stdout]
+{"applied_priority_mode":"unsupported","host_arch":"unknown","elapsed_ns":4216999,"implementation":"perl_optimized","ns_per_iteration":1054.24975,"schema_version":1,"timer_kind":"clock_gettime_ns","variant":"optimized","requested_affinity_mode":"single_core","applied_affinity_mode":"unsupported","ns_per_add":527.124875,"loop_trip_count":4000,"runtime_name":"perl","result_checksum":"0","iterations":4000,"language":"perl","case_id":"quick_single","requested_priority_mode":"high","pid":24634,"repeat_index":1,"host_os":"macos","platform_extras":{},"tid":0,"remainder":0,"warmup":true,"parallel_chains":1,"scheduler_notes":"Perl runtime uses controller-side best effort scheduling only"}
+
+[stderr]
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+Hexadecimal number > 0xffffffff non-portable at /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/BenchmarkCommon.pm line 19.

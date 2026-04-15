@@ -1,0 +1,2 @@
+[command-error]
+Missing native benchmark binary for cpp_sloppy. Expected tools/bin/macos-arm64/cpp_sloppy.

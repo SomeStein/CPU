@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from benchkit.build import build_assets
+from benchkit.catalog import implementation_catalog_rows
 from benchkit.history import load_index_rows, load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
-from benchkit.suite import list_profiles, load_profile, run_profile
+from benchkit.profiles import (
+    duplicate_to_custom,
+    load_profile,
+    profile_detail_rows,
+    profile_override_rows,
+    profile_rows,
+    save_custom_profile,
+    validation_rows,
+)
+from benchkit.suite import run_profile, run_profile_path
 
 
 def print_tsv(rows: list[dict[str, str]]) -> None:
@@ -27,32 +38,84 @@ def print_tsv(rows: list[dict[str, str]]) -> None:
 
 
 def command_profiles(_: argparse.Namespace) -> int:
-    print_tsv(list_profiles())
+    print_tsv(profile_rows())
     return 0
 
 
 def command_profile(args: argparse.Namespace) -> int:
+    print_tsv(profile_detail_rows(args.profile_id))
+    return 0
+
+
+def command_profile_overrides(args: argparse.Namespace) -> int:
+    print_tsv(profile_override_rows(args.profile_id))
+    return 0
+
+
+def command_profile_json_id(args: argparse.Namespace) -> int:
     profile = load_profile(args.profile_id)
-    rows = []
-    defaults = profile.get("defaults", {})
-    for index, case in enumerate(profile.get("matrix", []), start=1):
-        rows.append(
-            {
-                "profile_id": profile["id"],
-                "profile_name": profile["name"],
-                "case_index": str(index),
-                "case_id": case.get("case_id", ""),
-                "iterations": str(case.get("iterations", "")),
-                "parallel_chains": str(case.get("parallel_chains", "")),
-                "warmups": str(defaults.get("warmups", "")),
-                "repeats": str(defaults.get("repeats", "")),
-                "priority_mode": str(case.get("priority_mode", defaults.get("priority_mode", ""))),
-                "affinity_mode": str(case.get("affinity_mode", defaults.get("affinity_mode", ""))),
-                "timer_mode": str(case.get("timer_mode", defaults.get("timer_mode", ""))),
-                "implementations": ",".join(profile.get("implementations", [])),
-            }
+    sys.stdout.write(json.dumps(profile, indent=2, sort_keys=True))
+    sys.stdout.write("\n")
+    return 0
+
+
+def command_implementation_catalog(_: argparse.Namespace) -> int:
+    print_tsv(implementation_catalog_rows())
+    return 0
+
+
+def command_validate_profile_file(args: argparse.Namespace) -> int:
+    payload = json.loads(Path(args.path).read_text(encoding="utf-8"))
+    print_tsv(validation_rows(payload))
+    return 0
+
+
+def command_save_profile_file(args: argparse.Namespace) -> int:
+    payload = json.loads(Path(args.path).read_text(encoding="utf-8"))
+    saved_path = save_custom_profile(payload)
+    rows = [row for row in profile_rows() if row.get("profile_id") == payload.get("id")]
+    if rows:
+        print_tsv(rows)
+    else:
+        print_tsv(
+            [
+                {
+                    "profile_id": str(payload.get("id", "")),
+                    "name": str(payload.get("name", "")),
+                    "source": "custom",
+                    "editable": "true",
+                    "path": str(saved_path),
+                    "implementations": ",".join(payload.get("implementations", [])),
+                    "cases": str(len(payload.get("matrix", []))),
+                    "warmups": str(payload.get("defaults", {}).get("warmups", "")),
+                    "repeats": str(payload.get("defaults", {}).get("repeats", "")),
+                }
+            ]
         )
-    print_tsv(rows)
+    return 0
+
+
+def command_duplicate_profile(args: argparse.Namespace) -> int:
+    saved_path = duplicate_to_custom(args.profile_id, args.new_profile_id, args.name)
+    rows = [row for row in profile_rows() if row.get("profile_id") == args.new_profile_id]
+    if rows:
+        print_tsv(rows)
+    else:
+        print_tsv(
+            [
+                {
+                    "profile_id": args.new_profile_id,
+                    "name": args.name or args.new_profile_id,
+                    "source": "custom",
+                    "editable": "true",
+                    "path": str(saved_path),
+                    "implementations": "",
+                    "cases": "",
+                    "warmups": "",
+                    "repeats": "",
+                }
+            ]
+        )
     return 0
 
 
@@ -90,8 +153,7 @@ def command_raw(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_run_profile(args: argparse.Namespace) -> int:
-    assets = build_assets()
+def _run_with_events(result_runner, profile_label: str) -> int:
     headers_printed = False
 
     def emit(event: dict[str, str]) -> None:
@@ -121,15 +183,26 @@ def command_run_profile(args: argparse.Namespace) -> int:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
-    result = run_profile(
-        args.profile_id,
-        java_output_dir=Path(assets["java_output_dir"]),
-        native_binary=Path(assets["native_binary"]),
-        stream=emit,
-    )
+    assets = build_assets()
+    result = result_runner(Path(assets["java_output_dir"]), emit)
     if not headers_printed:
-        emit({"event_type": "run", "phase": "completed", "run_id": result["run_id"], "status": result["status"]})
+        emit({"event_type": "run", "phase": "completed", "run_id": result["run_id"], "profile_id": profile_label, "status": result["status"]})
     return 0 if result["status"] == "success" else 1
+
+
+def command_run_profile(args: argparse.Namespace) -> int:
+    return _run_with_events(
+        lambda java_output_dir, emit: run_profile(args.profile_id, java_output_dir=java_output_dir, stream=emit),
+        args.profile_id,
+    )
+
+
+def command_run_profile_file(args: argparse.Namespace) -> int:
+    profile_path = Path(args.path)
+    return _run_with_events(
+        lambda java_output_dir, emit: run_profile_path(profile_path, java_output_dir=java_output_dir, stream=emit),
+        profile_path.stem,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -142,6 +215,31 @@ def build_parser() -> argparse.ArgumentParser:
     profile = subparsers.add_parser("profile")
     profile.add_argument("profile_id")
     profile.set_defaults(handler=command_profile)
+
+    profile_overrides = subparsers.add_parser("profile-overrides")
+    profile_overrides.add_argument("profile_id")
+    profile_overrides.set_defaults(handler=command_profile_overrides)
+
+    profile_json = subparsers.add_parser("profile-json")
+    profile_json.add_argument("profile_id")
+    profile_json.set_defaults(handler=command_profile_json_id)
+
+    implementation_catalog = subparsers.add_parser("implementation-catalog")
+    implementation_catalog.set_defaults(handler=command_implementation_catalog)
+
+    validate_profile = subparsers.add_parser("validate-profile-file")
+    validate_profile.add_argument("path")
+    validate_profile.set_defaults(handler=command_validate_profile_file)
+
+    save_profile = subparsers.add_parser("save-profile-file")
+    save_profile.add_argument("path")
+    save_profile.set_defaults(handler=command_save_profile_file)
+
+    duplicate_profile = subparsers.add_parser("duplicate-profile")
+    duplicate_profile.add_argument("profile_id")
+    duplicate_profile.add_argument("new_profile_id")
+    duplicate_profile.add_argument("--name", default=None)
+    duplicate_profile.set_defaults(handler=command_duplicate_profile)
 
     runs = subparsers.add_parser("runs")
     runs.set_defaults(handler=command_runs)
@@ -168,6 +266,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd = subparsers.add_parser("run-profile")
     run_cmd.add_argument("profile_id")
     run_cmd.set_defaults(handler=command_run_profile)
+
+    run_profile_file = subparsers.add_parser("run-profile-file")
+    run_profile_file.add_argument("path")
+    run_profile_file.set_defaults(handler=command_run_profile_file)
 
     return parser
 

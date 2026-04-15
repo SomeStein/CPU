@@ -2,12 +2,11 @@
 
 This repository is a self-hosted benchmark lab for `windows-x64` and `macos-arm64`.
 
-It combines:
+It is organized around one main application:
 
-- a cross-platform launcher and task flow
-- a multi-language benchmark suite
-- tracked run artifacts and history
-- a dark-mode Swing controller with live monitoring, graphs, raw logs, and history analysis
+- the Swing launch deck opens the GUI
+- the GUI prepares assets, runs profiles, and analyzes stored history
+- the Python backend owns orchestration, validation, persistence, and legacy import
 
 ## Supported Targets
 
@@ -20,9 +19,22 @@ Explicitly out of scope:
 - Windows ARM
 - Linux
 
-## What Ships Here
+## Source Layout
 
-The benchmark suite currently includes:
+The repo is now split into explicit source domains for maintainability:
+
+- workspace tooling and orchestration: [`scripts/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts>)
+- backend orchestration modules: [`scripts/benchkit/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/benchkit>)
+- Swing GUI sources: [`gui/src/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/gui/src>)
+- benchmark sources by language: [`benchmarks/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks>)
+- saved built-in profiles: [`testruns/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns>)
+- saved custom profiles: [`testruns/custom/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns/custom>)
+- tracked run history: [`runs/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs>)
+- bundled runtimes and native binaries: [`tools/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools>)
+
+## Benchmark Suite
+
+The suite currently includes these implementations:
 
 - `c_native`
 - `python_sloppy`
@@ -31,18 +43,32 @@ The benchmark suite currently includes:
 - `node_optimized`
 - `java_sloppy`
 - `java_optimized`
+- `ruby_sloppy`
+- `ruby_optimized`
+- `perl_sloppy`
+- `perl_optimized`
+- `cpp_sloppy`
+- `cpp_optimized`
+- `go_sloppy`
+- `go_optimized`
+- `rust_sloppy`
+- `rust_optimized`
 
-Saved run profiles live in [`testruns/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns>) and currently include:
+Built-in profiles include:
 
 - `smoke`
 - `balanced`
 - `stress`
+- `polyglot_smoke`
+- `polyglot_balanced`
 
-## Core Commands
+Custom profiles are saved as `.testrun.json` files under [`testruns/custom/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns/custom>).
+
+## Main Workflow
 
 VS Code tasks are wired through [`scripts/run-task.sh`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/run-task.sh) and [`scripts/run-task.cmd`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/scripts/run-task.cmd).
 
-Direct CLI usage:
+Primary entrypoints:
 
 ```bash
 python3 scripts/launcher.py analyze
@@ -50,26 +76,33 @@ python3 scripts/launcher.py summary
 python3 scripts/analyze_runs.py
 ```
 
-`build` and `run` are no longer supported top-level workflow commands. The main application prepares assets and launches benchmark runs itself.
+`build` and `run` are intentionally no longer supported as top-level workflow commands. The launch deck owns asset preparation and run execution now.
 
-## UI Overview
+## GUI Overview
 
-The Swing app is intentionally split into controller-side UX and worker-side execution:
+The Swing app is a dark mission-control dashboard with:
 
-- the launcher window is dark-mode only
-- the window opens fitted to the visible screen and supports `F11` / `Esc` fullscreen control
-- runs are started from a profile selector in the hero bar
-- menus expose refresh, run, and in-app documentation actions
-- profile blueprints are shown in the left sidebar
-- dedicated run and global filters update tables and graphs interactively
-- separate workspace tabs are used for run browsing, run analysis, live monitoring, global analysis, and artifacts
-- the live monitor tab renders controller-side live events only
-- the global analysis tab compares stored data across runs without touching active timing
-- raw logs, manifest data, cycle/counter details when available, and result inspection are exposed in dedicated panes
+- fullscreen-aware launch behavior with `F11` / `Esc`
+- run browser and per-run analysis
+- live controller-side monitoring
+- global cross-run analysis
+- a dedicated custom run builder
+- raw log and manifest inspection
+- in-app repo documentation
 
-UI entrypoint:
+Main GUI entrypoint:
 
-- [`controller/src/cpubench/ControllerApp.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/controller/src/cpubench/ControllerApp.java)
+- [`gui/src/cpubench/ControllerApp.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ControllerApp.java)
+
+Custom run builder capabilities:
+
+- create a new draft from scratch
+- load built-in or custom profiles into the editor
+- duplicate built-in profiles into editable custom drafts
+- edit implementations, defaults, case matrix rows, and per-implementation overrides
+- validate drafts through the Python backend
+- save custom profiles to `testruns/custom`
+- run temporary drafts without changing the tracked built-in profiles
 
 ## Timing Safety
 
@@ -79,8 +112,8 @@ Timing isolation is the main invariant of the repository.
 - measured loops do not update GUI state
 - measured loops do not write files
 - the controller only reacts before launch and after each case completes
-- live monitoring is built from event boundaries and stored result rows
-- cycle or counter details are only surfaced from final worker payloads or legacy imported artifacts
+- live monitoring is built from phase-boundary events and persisted results
+- cycle or counter details are only surfaced when workers or legacy imports provide them
 
 Read the detailed contract in [`docs/TIMING_ISOLATION.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/docs/TIMING_ISOLATION.md).
 
@@ -94,23 +127,24 @@ Every modern run stores:
 - `cases/*.case`
 - `raw/*.log`
 
-Legacy runs are still supported and are imported into the same analysis flow.
+Legacy runs are still supported and imported into the same analysis flow.
 
-Tracked history starts in:
+Global tracked history starts in:
 
 - [`runs/index.csv`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/runs/index.csv)
 
 ## Runtime Bundles
 
-The launcher prefers repo-local runtimes first and falls back to system tools if the bundles are not present.
+The launcher prefers repo-local runtimes first and falls back to system tools when bundles are not present.
 
-Bundle layout is documented in:
+Bundle layout:
 
-- [`tools/runtime/README.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/tools/runtime/README.md)
+- runtimes: [`tools/runtime/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/runtime>)
+- native binaries: [`tools/bin/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/bin>)
 
-For fully self-contained fresh-clone operation, place the expected Python, Node, and Java runtimes into those directories.
+The compiled language pack is designed around checked-in host binaries, but the backend can also compile host-native assets when a local toolchain is available.
 
-## Repository Guide
+## Documentation Map
 
 Start here:
 
@@ -118,3 +152,4 @@ Start here:
 - [`docs/UI_UX.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/docs/UI_UX.md)
 - [`docs/TIMING_ISOLATION.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/docs/TIMING_ISOLATION.md)
 - [`AGENTS.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/AGENTS.md)
+- [`AGNETS.md`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/AGNETS.md)

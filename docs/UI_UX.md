@@ -2,17 +2,17 @@
 
 ## Design Direction
 
-The launcher is intentionally styled as a dark mission-control dashboard.
+The launch deck is intentionally a dark mission-control dashboard.
 
 Visual principles:
 
 - deep blue surfaces instead of flat black
-- bright cyan and teal accents for action and telemetry
-- warm warning colors for failures and risky states
-- rounded cards and panels for separation
-- generated icons so the repo does not depend on external assets
+- cyan and teal accents for action and telemetry
+- generated icons instead of external asset dependencies
+- modular card sections with large breathable work areas
+- separate workspaces for configuration, monitoring, analysis, and inspection
 
-## Layout
+## Main Layout
 
 The controller is divided into three adaptive zones.
 
@@ -30,14 +30,14 @@ Contains:
 - docs action
 - status pill
 - progress bar
-- fullscreen-ready launch state sized to the visible screen bounds
+- fullscreen hints and launch state
 
 ### Sidebar
 
 Contains:
 
 - profile blueprint summary
-- selected-run summary
+- selected run summary
 - run filters
 - global filters
 
@@ -45,35 +45,84 @@ Contains:
 
 Contains:
 
-- runs table
-- a dedicated run-analysis workspace with larger charts
-- a dedicated live-monitor workspace for event flow and the live feed
-- a dedicated global-analysis workspace for cross-run comparison
-- an artifacts workspace for detail, raw logs, and manifest inspection
-- cycle and counter context in the inspector when the host/runtime can provide it
+- run browser
+- custom run builder
+- per-run analysis
+- live monitor
+- global analysis
+- artifacts inspection
 
-## Interaction Model
+Each major task gets its own tab so graphs and tables have room instead of being squeezed onto one screen.
 
-- selecting a run loads results, events, and manifest together
-- selecting a result loads its raw log and the structured detail panel
-- selecting a result also exposes optional cycle and platform-counter fields without synthesizing missing values
-- run filters apply only to the loaded run
-- global filters apply only to cross-run analysis
-- live monitoring updates from event boundaries only
-- help menu entries open repo documentation inside the app
-- `F11` toggles fullscreen and `Esc` exits it
+## Custom Run Builder UX
 
-## UX Guardrails
+The custom builder is meant to feel like part of the main application, not an add-on dialog.
+
+Builder sections:
+
+- profile source and template picker
+- profile metadata
+- default scheduling/timing controls
+- grouped implementation selection
+- case matrix editor
+- per-implementation override table
+- validation and save/run feedback
+
+Builder actions:
+
+- `New`
+- `Load`
+- `Duplicate Built-In`
+- `Save`
+- `Save As`
+- `Run Now`
+- `Revert`
+
+Builder rules:
+
+- built-in profiles are templates
+- custom profiles are editable and saved under `testruns/custom`
+- temporary drafts can run without being persisted
+- all validation is delegated to the Python backend before save or run
+
+## Monitoring UX
+
+Live monitoring must remain timing-safe.
+
+- live status is driven by controller-side phase-boundary events only
+- worker loops never send progress callbacks
+- graphs update from completed samples after they finish
+- logs shown in the UI come from controller events or stored raw logs
+
+The monitor views should emphasize:
+
+- run progress
+- active implementation and case
+- elapsed and latest metric context
+- event flow and persisted artifacts
+
+## Analysis UX
+
+Analysis is intentionally split into per-run and global scopes.
+
+- run analysis focuses on the currently loaded run
+- global analysis compares stored results across runs
+- artifacts focus on one selected result row
+
+This separation keeps filters understandable and gives each chart enough space to stay readable.
+
+## Interaction Guardrails
 
 The controller must never:
 
-- sample timing inside worker loops
-- request frequent worker callbacks
-- add UI output from benchmark code
-- write monitoring artifacts from measured sections
+- read timing from inside worker loops
+- request high-frequency callbacks from workers
+- write monitoring artifacts from inside measured regions
+- infer missing cycle data or synthesize counters
 
 The controller may:
 
-- render new graphs from persisted result rows
-- render live status from launch/finish events
-- inspect raw logs after completion
+- build new graphs from persisted result rows
+- compare stored runs globally
+- validate and save custom profiles
+- open repository documentation inside the app

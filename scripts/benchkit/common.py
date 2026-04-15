@@ -10,21 +10,46 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = ROOT_DIR / "scripts"
+GUI_DIR = ROOT_DIR / "gui"
+GUI_SRC_DIR = GUI_DIR / "src"
+BENCHMARKS_DIR = ROOT_DIR / "benchmarks"
+BENCHMARK_C_DIR = BENCHMARKS_DIR / "c"
+BENCHMARK_CPP_DIR = BENCHMARKS_DIR / "cpp"
+BENCHMARK_GO_DIR = BENCHMARKS_DIR / "go"
+BENCHMARK_JAVA_DIR = BENCHMARKS_DIR / "java"
+BENCHMARK_JAVA_SRC_DIR = BENCHMARK_JAVA_DIR / "src"
+BENCHMARK_NODE_DIR = BENCHMARKS_DIR / "node"
+BENCHMARK_PERL_DIR = BENCHMARKS_DIR / "perl"
+BENCHMARK_PYTHON_DIR = BENCHMARKS_DIR / "python"
+BENCHMARK_RUBY_DIR = BENCHMARKS_DIR / "ruby"
+BENCHMARK_RUST_DIR = BENCHMARKS_DIR / "rust"
 RUNS_DIR = ROOT_DIR / "runs"
 TESTRUNS_DIR = ROOT_DIR / "testruns"
+CUSTOM_TESTRUNS_DIR = TESTRUNS_DIR / "custom"
 BUILD_DIR = ROOT_DIR / "build"
 TOOLS_DIR = ROOT_DIR / "tools"
+TOOLS_BIN_DIR = TOOLS_DIR / "bin"
 
 RUN_DIR_PATTERN = re.compile(r"^run(?P<number>\d+)_(?P<stamp>\d{2}_\d{2}_\d{2}_\d{2}_\d{2})$")
 
 IMPLEMENTATION_METADATA = {
     "c_native": {"language": "c", "variant": "native"},
+    "cpp_sloppy": {"language": "cpp", "variant": "sloppy"},
+    "cpp_optimized": {"language": "cpp", "variant": "optimized"},
+    "go_sloppy": {"language": "go", "variant": "sloppy"},
+    "go_optimized": {"language": "go", "variant": "optimized"},
+    "java_sloppy": {"language": "java", "variant": "sloppy"},
+    "java_optimized": {"language": "java", "variant": "optimized"},
     "python_sloppy": {"language": "python", "variant": "sloppy"},
     "python_optimized": {"language": "python", "variant": "optimized"},
     "node_sloppy": {"language": "node", "variant": "sloppy"},
     "node_optimized": {"language": "node", "variant": "optimized"},
-    "java_sloppy": {"language": "java", "variant": "sloppy"},
-    "java_optimized": {"language": "java", "variant": "optimized"},
+    "perl_sloppy": {"language": "perl", "variant": "sloppy"},
+    "perl_optimized": {"language": "perl", "variant": "optimized"},
+    "ruby_sloppy": {"language": "ruby", "variant": "sloppy"},
+    "ruby_optimized": {"language": "ruby", "variant": "optimized"},
+    "rust_sloppy": {"language": "rust", "variant": "sloppy"},
+    "rust_optimized": {"language": "rust", "variant": "optimized"},
 }
 
 RESULT_FIELD_ORDER = [
@@ -91,6 +116,7 @@ HOST_OS = host_os()
 HOST_ARCH = normalize_arch(platform.machine())
 HOST_KEY = f"{HOST_OS}-{HOST_ARCH}"
 SUPPORTED_HOSTS = {"windows-x64", "macos-arm64"}
+HOST_BIN_DIR = TOOLS_BIN_DIR / HOST_KEY
 
 
 def ensure_supported_host() -> None:
@@ -202,4 +228,3 @@ def parse_float(value: str | None, default: float = 0.0) -> float:
     if value in {None, ""}:
         return default
     return float(value)
-

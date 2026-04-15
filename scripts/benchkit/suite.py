@@ -7,23 +7,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from .catalog import IMPLEMENTATIONS, ImplementationEntry, implementation_entry
 from .common import (
     HOST_ARCH,
     HOST_OS,
     RESULT_FIELD_ORDER,
     ROOT_DIR,
     RUNS_DIR,
-    TESTRUNS_DIR,
     build_run_id,
     implementation_metadata,
     next_run_number,
-    read_json,
     stringify,
     write_csv_rows,
     write_json,
     write_key_value_file,
 )
 from .history import append_index_rows
+from .profiles import load_profile, load_profile_path, profile_location, profile_rows
 from .runtimes import ResolvedTool, resolve_tool
 
 
@@ -31,97 +31,67 @@ EventCallback = Callable[[dict[str, str]], None]
 
 
 @dataclass(frozen=True)
-class ImplementationSpec:
-    implementation_id: str
-    runtime_name: str
-
-    def command(self, runtime: ResolvedTool, case_file: Path, java_output_dir: Path, native_binary: Path) -> list[str]:
-        if self.implementation_id == "c_native":
-            return [str(native_binary), "--case-file", str(case_file)]
-        if self.implementation_id.startswith("python_"):
-            return [str(runtime.path), str(ROOT_DIR / "scripts" / f"{self.implementation_id}.py"), "--case-file", str(case_file)]
-        if self.implementation_id.startswith("node_"):
-            return [str(runtime.path), str(ROOT_DIR / "scripts" / f"{self.implementation_id}.mjs"), "--case-file", str(case_file)]
-        if self.implementation_id.startswith("java_"):
-            class_name = "bench.JavaSloppy" if self.implementation_id == "java_sloppy" else "bench.JavaOptimized"
-            return [str(runtime.path), "-cp", str(java_output_dir), class_name, "--case-file", str(case_file)]
-        raise KeyError(f"Unsupported implementation: {self.implementation_id}")
-
-
-IMPLEMENTATION_SPECS = {
-    "c_native": ImplementationSpec("c_native", "native"),
-    "python_sloppy": ImplementationSpec("python_sloppy", "python"),
-    "python_optimized": ImplementationSpec("python_optimized", "python"),
-    "node_sloppy": ImplementationSpec("node_sloppy", "node"),
-    "node_optimized": ImplementationSpec("node_optimized", "node"),
-    "java_sloppy": ImplementationSpec("java_sloppy", "java"),
-    "java_optimized": ImplementationSpec("java_optimized", "java"),
-}
+class LoadedProfile:
+    payload: dict
+    source: str
+    path: Path
 
 
 def list_profiles() -> list[dict[str, str]]:
-    profiles = []
-    for path in sorted(TESTRUNS_DIR.glob("*.testrun.json")):
-        payload = read_json(path)
-        profiles.append(
-            {
-                "profile_id": payload["id"],
-                "name": payload["name"],
-                "implementations": ",".join(payload["implementations"]),
-                "cases": str(len(payload["matrix"])),
-                "warmups": str(payload["defaults"]["warmups"]),
-                "repeats": str(payload["defaults"]["repeats"]),
-            }
-        )
-    return profiles
+    return profile_rows()
 
 
-def load_profile(profile_id: str) -> dict:
-    path = TESTRUNS_DIR / f"{profile_id}.testrun.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Unknown profile '{profile_id}'.")
-    return read_json(path)
+def load_profile_record(profile_id: str) -> LoadedProfile:
+    source, path = profile_location(profile_id)
+    return LoadedProfile(load_profile(profile_id), source, path)
 
 
-def _resolve_runtime(name: str) -> ResolvedTool:
-    if name == "native":
-        return ResolvedTool("native", Path("native"), "bundled")
-    return resolve_tool(name)
+def load_profile_definition(profile_id: str) -> dict:
+    return load_profile(profile_id)
 
 
-def _event(stream: EventCallback | None, events: list[dict[str, str]], **payload: object) -> None:
-    normalized = {key: stringify(value) for key, value in payload.items()}
-    events.append(normalized)
-    if stream is not None:
-        stream(normalized)
-
-
-def _case_values(profile_id: str, implementation: str, case: dict, defaults: dict, repeat_index: int, warmup: bool) -> dict[str, object]:
-    override = case.get("overrides", {}).get(implementation, {})
-    effective = {
-        "run_id": "",
-        "profile_id": profile_id,
-        "implementation": implementation,
-        "case_id": case["case_id"],
-        "iterations": override.get("iterations", case["iterations"]),
-        "parallel_chains": override.get("parallel_chains", case["parallel_chains"]),
-        "priority_mode": override.get("priority_mode", case.get("priority_mode", defaults["priority_mode"])),
-        "affinity_mode": override.get("affinity_mode", case.get("affinity_mode", defaults["affinity_mode"])),
-        "timer_mode": override.get("timer_mode", case.get("timer_mode", defaults["timer_mode"])),
-        "warmup": "true" if warmup else "false",
-        "repeat_index": repeat_index,
-    }
-    return effective
+def load_profile_from_path(path: Path) -> LoadedProfile:
+    resolved = path.resolve()
+    source = "temporary"
+    try:
+        known_source, known_path = profile_location(resolved.stem.replace(".testrun", ""))
+        if known_path.resolve() == resolved:
+            source = known_source
+    except FileNotFoundError:
+        if "testruns/custom" in resolved.as_posix():
+            source = "custom"
+        elif "/testruns/" in resolved.as_posix():
+            source = "builtin"
+    return LoadedProfile(load_profile_path(resolved), source, resolved)
 
 
 def run_profile(
     profile_id: str,
     *,
     java_output_dir: Path,
-    native_binary: Path,
     stream: EventCallback | None = None,
 ) -> dict[str, str]:
-    profile = load_profile(profile_id)
+    profile = load_profile_record(profile_id)
+    return run_profile_payload(profile, java_output_dir=java_output_dir, stream=stream)
+
+
+def run_profile_path(
+    profile_path: Path,
+    *,
+    java_output_dir: Path,
+    stream: EventCallback | None = None,
+) -> dict[str, str]:
+    profile = load_profile_from_path(profile_path)
+    return run_profile_payload(profile, java_output_dir=java_output_dir, stream=stream)
+
+
+def run_profile_payload(
+    profile: LoadedProfile,
+    *,
+    java_output_dir: Path,
+    stream: EventCallback | None = None,
+) -> dict[str, str]:
+    payload = profile.payload
     timestamp = datetime.now()
     run_number = next_run_number()
     run_id = build_run_id(run_number, timestamp)
@@ -134,27 +104,30 @@ def run_profile(
 
     events: list[dict[str, str]] = []
     results: list[dict[str, str]] = []
+    if profile.path.is_absolute():
+        try:
+            profile_path_text = str(profile.path.relative_to(ROOT_DIR)).replace("\\", "/")
+        except ValueError:
+            profile_path_text = str(profile.path)
+    else:
+        profile_path_text = str(profile.path)
     manifest = {
         "schema_version": 1,
         "run_id": run_id,
         "run_number": run_number,
         "started_at": timestamp.isoformat(timespec="seconds"),
-        "profile": profile,
+        "profile": payload,
+        "profile_source": profile.source,
+        "profile_path": profile_path_text,
         "host_os": HOST_OS,
         "host_arch": HOST_ARCH,
     }
     write_json(run_dir / "manifest.json", manifest)
 
-    runtimes = {
-        "python": resolve_tool("python"),
-        "node": resolve_tool("node"),
-        "java": resolve_tool("java"),
-    }
-
-    defaults = profile["defaults"]
+    defaults = payload["defaults"]
     warmups = int(defaults["warmups"])
     repeats = int(defaults["repeats"])
-    step_total = len(profile["implementations"]) * len(profile["matrix"]) * (warmups + repeats)
+    step_total = len(payload["implementations"]) * len(payload["matrix"]) * (warmups + repeats)
     step_index = 0
 
     _event(
@@ -163,27 +136,26 @@ def run_profile(
         event_type="run",
         phase="started",
         run_id=run_id,
-        profile_id=profile_id,
+        profile_id=payload["id"],
         step_index=0,
         step_total=step_total,
-        message=f"Starting profile {profile_id}",
+        message=f"Starting profile {payload['id']}",
     )
 
-    for implementation in profile["implementations"]:
-        spec = IMPLEMENTATION_SPECS[implementation]
-        runtime = runtimes.get(spec.runtime_name, ResolvedTool("native", native_binary, "bundled"))
-        for case in profile["matrix"]:
+    for implementation_id in payload["implementations"]:
+        entry = IMPLEMENTATIONS[implementation_id]
+        runtime = _resolve_runtime(entry)
+        for case in payload["matrix"]:
             for warmup_index in range(1, warmups + 1):
-                case_values = _case_values(profile_id, implementation, case, defaults, warmup_index, True)
+                case_values = _case_values(payload["id"], implementation_id, case, defaults, warmup_index, True)
                 case_values["run_id"] = run_id
-                execution_name = f"{implementation}__{case['case_id']}__warmup_{warmup_index}"
+                execution_name = f"{implementation_id}__{case['case_id']}__warmup_{warmup_index}"
                 _execute_case(
-                    spec=spec,
+                    entry=entry,
                     runtime=runtime,
                     case_values=case_values,
                     execution_name=execution_name,
                     java_output_dir=java_output_dir,
-                    native_binary=native_binary,
                     run_dir=run_dir,
                     cases_dir=cases_dir,
                     raw_dir=raw_dir,
@@ -196,16 +168,15 @@ def run_profile(
                 )
                 step_index += 1
             for repeat_index in range(1, repeats + 1):
-                case_values = _case_values(profile_id, implementation, case, defaults, repeat_index, False)
+                case_values = _case_values(payload["id"], implementation_id, case, defaults, repeat_index, False)
                 case_values["run_id"] = run_id
-                execution_name = f"{implementation}__{case['case_id']}__repeat_{repeat_index}"
+                execution_name = f"{implementation_id}__{case['case_id']}__repeat_{repeat_index}"
                 _execute_case(
-                    spec=spec,
+                    entry=entry,
                     runtime=runtime,
                     case_values=case_values,
                     execution_name=execution_name,
                     java_output_dir=java_output_dir,
-                    native_binary=native_binary,
                     run_dir=run_dir,
                     cases_dir=cases_dir,
                     raw_dir=raw_dir,
@@ -221,8 +192,6 @@ def run_profile(
     write_csv_rows(run_dir / "results.csv", RESULT_FIELD_ORDER, results)
     append_index_rows(results)
     events_path = run_dir / "events.ndjson"
-    events_path.write_text("".join(json.dumps(event, sort_keys=True) + "\n" for event in events), encoding="utf-8")
-
     status = "success"
     if any(row.get("status") != "success" for row in results):
         status = "partial_failure"
@@ -233,24 +202,82 @@ def run_profile(
         event_type="run",
         phase="completed",
         run_id=run_id,
-        profile_id=profile_id,
+        profile_id=payload["id"],
         status=status,
         step_index=step_total,
         step_total=step_total,
-        message=f"Completed profile {profile_id}",
+        message=f"Completed profile {payload['id']}",
     )
     events_path.write_text("".join(json.dumps(event, sort_keys=True) + "\n" for event in events), encoding="utf-8")
     return {"run_id": run_id, "status": status}
 
 
+def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:
+    if entry.runner_kind == "native-binary":
+        binary_path = entry.binary_path
+        if binary_path is not None and binary_path.exists():
+            return ResolvedTool(name=entry.binary_stem or entry.implementation_id, path=binary_path, source="repo_binary")
+        return ResolvedTool(
+            name=entry.binary_stem or entry.implementation_id,
+            path=binary_path or Path(entry.implementation_id),
+            source="missing",
+        )
+    return resolve_tool(entry.runtime_kind, required=False)
+
+
+def _command_for_entry(entry: ImplementationEntry, runtime: ResolvedTool, case_file: Path, java_output_dir: Path) -> list[str]:
+    if entry.runner_kind == "native-binary":
+        if runtime.source == "missing" or not runtime.path.exists():
+            raise FileNotFoundError(
+                f"Missing native benchmark binary for {entry.implementation_id}. "
+                f"Expected {runtime.path.relative_to(ROOT_DIR) if runtime.path.is_absolute() else runtime.path}."
+            )
+        return [str(runtime.path), "--case-file", str(case_file)]
+    if runtime.source == "missing" or (runtime.path.name and not runtime.path.exists()):
+        raise FileNotFoundError(
+            f"Missing runtime '{entry.runtime_kind}' for {entry.implementation_id}. "
+            "Bundle it under tools/runtime or install it on PATH."
+        )
+    if entry.runner_kind in {"python-script", "node-script", "ruby-script", "perl-script"}:
+        assert entry.source_path is not None
+        return [str(runtime.path), str(entry.source_path), "--case-file", str(case_file)]
+    if entry.runner_kind == "java-class":
+        assert entry.java_class is not None
+        return [str(runtime.path), "-cp", str(java_output_dir), entry.java_class, "--case-file", str(case_file)]
+    raise KeyError(f"Unsupported runner kind: {entry.runner_kind}")
+
+
+def _event(stream: EventCallback | None, events: list[dict[str, str]], **payload: object) -> None:
+    normalized = {key: stringify(value) for key, value in payload.items()}
+    events.append(normalized)
+    if stream is not None:
+        stream(normalized)
+
+
+def _case_values(profile_id: str, implementation: str, case: dict, defaults: dict, repeat_index: int, warmup: bool) -> dict[str, object]:
+    override = case.get("overrides", {}).get(implementation, {})
+    return {
+        "run_id": "",
+        "profile_id": profile_id,
+        "implementation": implementation,
+        "case_id": case["case_id"],
+        "iterations": override.get("iterations", case["iterations"]),
+        "parallel_chains": override.get("parallel_chains", case["parallel_chains"]),
+        "priority_mode": override.get("priority_mode", case.get("priority_mode", defaults["priority_mode"])),
+        "affinity_mode": override.get("affinity_mode", case.get("affinity_mode", defaults["affinity_mode"])),
+        "timer_mode": override.get("timer_mode", case.get("timer_mode", defaults["timer_mode"])),
+        "warmup": "true" if warmup else "false",
+        "repeat_index": repeat_index,
+    }
+
+
 def _execute_case(
     *,
-    spec: ImplementationSpec,
+    entry: ImplementationEntry,
     runtime: ResolvedTool,
     case_values: dict[str, object],
     execution_name: str,
     java_output_dir: Path,
-    native_binary: Path,
     run_dir: Path,
     cases_dir: Path,
     raw_dir: Path,
@@ -263,30 +290,9 @@ def _execute_case(
 ) -> None:
     case_file = cases_dir / f"{execution_name}.case"
     write_key_value_file(case_file, case_values)
-    command = spec.command(runtime, case_file, java_output_dir, native_binary)
-    _event(
-        stream,
-        events,
-        event_type="case",
-        phase="launch",
-        run_id=manifest["run_id"],
-        profile_id=manifest["profile"]["id"],
-        implementation=spec.implementation_id,
-        case_id=stringify(case_values["case_id"]),
-        repeat_index=stringify(case_values["repeat_index"]),
-        warmup=stringify(case_values["warmup"]),
-        step_index=step_index,
-        step_total=step_total,
-        command=" ".join(command),
-        message=f"Launching {execution_name}",
-    )
 
-    completed = subprocess.run(command, cwd=ROOT_DIR, capture_output=True, text=True, check=False)
     raw_log_path = raw_dir / f"{execution_name}.log"
-    raw_log_text = f"[command]\n{' '.join(command)}\n\n[stdout]\n{completed.stdout}\n[stderr]\n{completed.stderr}"
-    raw_log_path.write_text(raw_log_text, encoding="utf-8")
-
-    row = {
+    base_row = {
         "run_id": manifest["run_id"],
         "run_number": manifest["run_number"],
         "started_at": manifest["started_at"],
@@ -294,7 +300,7 @@ def _execute_case(
         "profile_name": manifest["profile"]["name"],
         "host_os": HOST_OS,
         "host_arch": HOST_ARCH,
-        "implementation": spec.implementation_id,
+        "implementation": entry.implementation_id,
         "case_id": stringify(case_values["case_id"]),
         "warmup": stringify(case_values["warmup"]),
         "repeat_index": stringify(case_values["repeat_index"]),
@@ -309,8 +315,66 @@ def _execute_case(
         "raw_file": str(raw_log_path.relative_to(ROOT_DIR)).replace("\\", "/"),
         "error_message": "",
     }
-    row.update(implementation_metadata(spec.implementation_id))
+    base_row.update(implementation_metadata(entry.implementation_id))
 
+    try:
+        command = _command_for_entry(entry, runtime, case_file, java_output_dir)
+    except Exception as error:
+        raw_log_path.write_text(f"[command-error]\n{error}\n", encoding="utf-8")
+        row = dict(base_row)
+        row["error_message"] = str(error)
+        _append_result_and_event(
+            row=row,
+            entry=entry,
+            execution_name=execution_name,
+            manifest=manifest,
+            results=results,
+            events=events,
+            stream=stream,
+            step_index=step_index,
+            step_total=step_total,
+        )
+        return
+
+    _event(
+        stream,
+        events,
+        event_type="case",
+        phase="launch",
+        run_id=manifest["run_id"],
+        profile_id=manifest["profile"]["id"],
+        implementation=entry.implementation_id,
+        case_id=stringify(case_values["case_id"]),
+        repeat_index=stringify(case_values["repeat_index"]),
+        warmup=stringify(case_values["warmup"]),
+        step_index=step_index,
+        step_total=step_total,
+        command=" ".join(command),
+        message=f"Launching {execution_name}",
+    )
+
+    try:
+        completed = subprocess.run(command, cwd=ROOT_DIR, capture_output=True, text=True, check=False)
+        raw_log_text = f"[command]\n{' '.join(command)}\n\n[stdout]\n{completed.stdout}\n[stderr]\n{completed.stderr}"
+        raw_log_path.write_text(raw_log_text, encoding="utf-8")
+    except Exception as error:
+        raw_log_path.write_text(f"[command]\n{' '.join(command)}\n\n[start-error]\n{error}\n", encoding="utf-8")
+        row = dict(base_row)
+        row["error_message"] = str(error)
+        _append_result_and_event(
+            row=row,
+            entry=entry,
+            execution_name=execution_name,
+            manifest=manifest,
+            results=results,
+            events=events,
+            stream=stream,
+            step_index=step_index,
+            step_total=step_total,
+        )
+        return
+
+    row = dict(base_row)
     if completed.returncode == 0:
         try:
             payload = json.loads(completed.stdout.strip())
@@ -335,8 +399,33 @@ def _execute_case(
         except json.JSONDecodeError as exc:
             row["error_message"] = f"Invalid JSON output: {exc}"
     else:
-        row["error_message"] = completed.stderr.strip() or f"Exit code {completed.returncode}"
+        row["error_message"] = completed.stderr.strip() or completed.stdout.strip() or f"Exit code {completed.returncode}"
 
+    _append_result_and_event(
+        row=row,
+        entry=entry,
+        execution_name=execution_name,
+        manifest=manifest,
+        results=results,
+        events=events,
+        stream=stream,
+        step_index=step_index,
+        step_total=step_total,
+    )
+
+
+def _append_result_and_event(
+    *,
+    row: dict[str, str],
+    entry: ImplementationEntry,
+    execution_name: str,
+    manifest: dict,
+    results: list[dict[str, str]],
+    events: list[dict[str, str]],
+    stream: EventCallback | None,
+    step_index: int,
+    step_total: int,
+) -> None:
     results.append({field: stringify(row.get(field, "")) for field in RESULT_FIELD_ORDER})
     _event(
         stream,
@@ -345,10 +434,10 @@ def _execute_case(
         phase="finished",
         run_id=manifest["run_id"],
         profile_id=manifest["profile"]["id"],
-        implementation=spec.implementation_id,
-        case_id=stringify(case_values["case_id"]),
-        repeat_index=stringify(case_values["repeat_index"]),
-        warmup=stringify(case_values["warmup"]),
+        implementation=entry.implementation_id,
+        case_id=row.get("case_id", ""),
+        repeat_index=row.get("repeat_index", ""),
+        warmup=row.get("warmup", ""),
         status=row["status"],
         metric=row.get("ns_per_iteration") or row.get("legacy_cycles_per_iteration", ""),
         metric_kind="ns/iter" if row.get("ns_per_iteration") else ("cycles/iter" if row.get("legacy_cycles_per_iteration") else ""),

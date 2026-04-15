@@ -1,0 +1,89 @@
+{
+  "defaults": {
+    "affinity_mode": "single_core",
+    "priority_mode": "high",
+    "repeats": 2,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "polyglot_balanced",
+  "implementations": [
+    "c_native",
+    "python_sloppy",
+    "python_optimized",
+    "node_sloppy",
+    "node_optimized",
+    "java_sloppy",
+    "java_optimized",
+    "ruby_sloppy",
+    "ruby_optimized",
+    "perl_sloppy",
+    "perl_optimized",
+    "cpp_sloppy",
+    "cpp_optimized",
+    "go_sloppy",
+    "go_optimized",
+    "rust_sloppy",
+    "rust_optimized"
+  ],
+  "matrix": [
+    {
+      "case_id": "poly_single_chain",
+      "iterations": 60000,
+      "parallel_chains": 1,
+      "overrides": {
+        "perl_sloppy": {
+          "iterations": 24000
+        },
+        "perl_optimized": {
+          "iterations": 36000
+        },
+        "ruby_sloppy": {
+          "iterations": 36000
+        }
+      }
+    },
+    {
+      "case_id": "poly_four_chains",
+      "iterations": 180000,
+      "parallel_chains": 4,
+      "overrides": {
+        "perl_sloppy": {
+          "iterations": 64000
+        },
+        "perl_optimized": {
+          "iterations": 96000
+        },
+        "ruby_sloppy": {
+          "iterations": 96000
+        }
+      }
+    },
+    {
+      "case_id": "poly_eight_chains",
+      "iterations": 320000,
+      "parallel_chains": 8,
+      "overrides": {
+        "python_sloppy": {
+          "iterations": 120000
+        },
+        "node_sloppy": {
+          "iterations": 120000
+        },
+        "java_sloppy": {
+          "iterations": 120000
+        },
+        "ruby_sloppy": {
+          "iterations": 96000
+        },
+        "perl_sloppy": {
+          "iterations": 64000
+        },
+        "perl_optimized": {
+          "iterations": 96000
+        }
+      }
+    }
+  ],
+  "name": "Polyglot Balanced"
+}

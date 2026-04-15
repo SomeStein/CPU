@@ -1,0 +1,7 @@
+[command]
+/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/node/node_sloppy.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/node_sloppy__stress4__repeat_17.case
+
+[stdout]
+{"schema_version":1,"implementation":"node_sloppy","language":"node","variant":"sloppy","case_id":"stress4","warmup":false,"repeat_index":17,"iterations":10000000,"parallel_chains":4,"loop_trip_count":2500000,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":873170333,"ns_per_iteration":87.3170333,"ns_per_add":43.65851665,"result_checksum":"2114941700197524897","host_os":"macos","host_arch":"arm64","pid":45421,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"unchanged","applied_priority_mode":"unsupported","applied_affinity_mode":"unchanged","scheduler_notes":"Node runtime uses controller-side best effort only","runtime_name":"node","platform_extras":{}}
+
+[stderr]
