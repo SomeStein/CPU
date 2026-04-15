@@ -10,7 +10,10 @@ public record ImplementationCatalogEntry(
     String deliveryKind,
     String hostSupport,
     String defaultProfileScope,
-    String description
+    String description,
+    String displayName,
+    String group,
+    String color
 ) {
     public static ImplementationCatalogEntry fromRow(Map<String, String> row) {
         return new ImplementationCatalogEntry(
@@ -21,11 +24,14 @@ public record ImplementationCatalogEntry(
             row.getOrDefault("delivery_kind", ""),
             row.getOrDefault("host_support", ""),
             row.getOrDefault("default_profile_scope", ""),
-            row.getOrDefault("description", "")
+            row.getOrDefault("description", ""),
+            row.getOrDefault("display_name", ""),
+            row.getOrDefault("group", ""),
+            row.getOrDefault("color", "")
         );
     }
 
     public String displayName() {
-        return implementationId + " · " + language + " / " + variant;
+        return (displayName.isBlank() ? implementationId : displayName) + " · " + language + " / " + variant;
     }
 }

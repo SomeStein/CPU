@@ -4,17 +4,19 @@
     "priority_mode": "high",
     "repeats": 3,
     "timer_mode": "monotonic_ns",
-    "warmups": 1
+    "warmups": 2
   },
   "id": "balanced",
   "implementations": [
-    "c_native",
-    "python_sloppy",
-    "python_optimized",
-    "node_sloppy",
-    "node_optimized",
-    "java_sloppy",
-    "java_optimized"
+    "c",
+    "cpp",
+    "rust",
+    "go",
+    "java",
+    "node",
+    "python",
+    "ruby",
+    "perl"
   ],
   "matrix": [
     {
@@ -30,18 +32,7 @@
     {
       "case_id": "eight_chains",
       "iterations": 480000,
-      "parallel_chains": 8,
-      "overrides": {
-        "python_sloppy": {
-          "iterations": 120000
-        },
-        "node_sloppy": {
-          "iterations": 120000
-        },
-        "java_sloppy": {
-          "iterations": 120000
-        }
-      }
+      "parallel_chains": 8
     }
   ],
   "name": "Balanced"

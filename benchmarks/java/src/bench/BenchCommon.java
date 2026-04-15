@@ -52,17 +52,20 @@ final class BenchCommon {
 
     static Context prepareContext(CaseData caseData) {
         Thread current = Thread.currentThread();
+        boolean isMacos = System.getProperty("os.name").toLowerCase().contains("mac");
         String appliedPriority = "unchanged";
         if ("high".equals(caseData.priorityMode())) {
             try {
                 current.setPriority(Thread.MAX_PRIORITY);
-                appliedPriority = "high";
+                appliedPriority = isMacos ? "advisory_macos" : "high";
             } catch (IllegalArgumentException ignored) {
-                appliedPriority = "unsupported";
+                appliedPriority = isMacos ? "advisory_macos" : "unsupported";
             }
         }
-        String appliedAffinity = "single_core".equals(caseData.affinityMode()) ? "unsupported" : "unchanged";
-        String notes = "Java benchmark uses controller-side best effort scheduling only";
+        String appliedAffinity = "single_core".equals(caseData.affinityMode()) ? (isMacos ? "advisory_macos" : "unsupported") : "unchanged";
+        String notes = isMacos
+            ? "Java benchmark uses controller-side best effort scheduling only; macOS affinity remains advisory"
+            : "Java benchmark uses controller-side best effort scheduling only";
         return new Context(
             ProcessHandle.current().pid(),
             current.threadId(),

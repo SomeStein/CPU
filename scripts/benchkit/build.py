@@ -60,6 +60,12 @@ def build_java() -> Path:
     output_dir = BUILD_DIR / "java"
     output_dir.mkdir(parents=True, exist_ok=True)
     _run([str(javac.path), "-d", str(output_dir), *sources])
+    assets_dir = GUI_SRC_DIR / "cpubench" / "ui" / "assets"
+    if assets_dir.exists():
+        target_assets = output_dir / "cpubench" / "ui" / "assets"
+        if target_assets.exists():
+            shutil.rmtree(target_assets)
+        shutil.copytree(assets_dir, target_assets)
     return output_dir
 
 
@@ -73,7 +79,7 @@ def build_compiled_entry(entry: ImplementationEntry, *, required: bool) -> Path:
         if compiler is None:
             if entry.binary_path.exists():
                 return entry.binary_path
-            raise FileNotFoundError("No C compiler found and no prebuilt c_native binary is available.")
+            raise FileNotFoundError("No C compiler found and no prebuilt c binary is available.")
         compiler_name = Path(compiler).name.lower()
         if compiler_name in {"cl.exe", "cl"}:
             _run([compiler, "/O2", "/W3", f"/Fe:{entry.binary_path}", str(entry.source_path)])
@@ -112,7 +118,6 @@ def build_compiled_entry(entry: ImplementationEntry, *, required: bool) -> Path:
                     "-std=c++17",
                     "-Wall",
                     "-Wextra",
-                    *_macos_sdk_flags(),
                     "-o",
                     str(entry.binary_path),
                     str(entry.source_path),
@@ -147,7 +152,7 @@ def build_compiled_benchmarks() -> dict[str, str]:
     for entry in IMPLEMENTATIONS.values():
         if entry.compiler_kind is None:
             continue
-        required = entry.implementation_id == "c_native"
+        required = entry.implementation_id == "c"
         try:
             path = build_compiled_entry(entry, required=required)
             built[entry.implementation_id] = str(path)
@@ -160,9 +165,8 @@ def build_compiled_benchmarks() -> dict[str, str]:
 def build_assets() -> dict[str, str]:
     ensure_supported_host()
     java_dir = build_java()
-    binaries = build_compiled_benchmarks()
+    build_compiled_benchmarks()
     return {
         "java_output_dir": str(java_dir),
-        "native_binary": binaries.get("c_native", ""),
         "scripts_dir": str(SCRIPTS_DIR),
     }

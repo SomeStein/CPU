@@ -192,6 +192,7 @@ func buildResult(implementation string, variant string, data caseData, loopTripC
 	if hostArch == "amd64" {
 		hostArch = "x64"
 	}
+	isMacos := hostOS == "macos"
 	return resultPayload{
 		SchemaVersion:         1,
 		Implementation:        implementation,
@@ -215,9 +216,9 @@ func buildResult(implementation string, variant string, data caseData, loopTripC
 		Tid:                   0,
 		RequestedPriorityMode: data.PriorityMode,
 		RequestedAffinityMode: data.AffinityMode,
-		AppliedPriorityMode:   "unsupported",
-		AppliedAffinityMode:   ternary(data.AffinityMode == "single_core", "unsupported", "unchanged"),
-		SchedulerNotes:        "Go benchmark uses controller-side best effort scheduling only",
+		AppliedPriorityMode:   ternary(data.PriorityMode == "high" && isMacos, "advisory_macos", "unsupported"),
+		AppliedAffinityMode:   ternary(data.AffinityMode == "single_core", ternary(isMacos, "advisory_macos", "unsupported"), "unchanged"),
+		SchedulerNotes:        ternary(isMacos, "Go benchmark uses controller-side best effort scheduling only; macOS affinity remains advisory", "Go benchmark uses controller-side best effort scheduling only"),
 		RuntimeName:           "go",
 		PlatformExtras:        map[string]any{},
 	}

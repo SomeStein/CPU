@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#00ADD8"/>
+  <rect x="9" y="9" width="46" height="46" rx="12" fill="#082F49" stroke="#ECFEFF" stroke-width="1.5"/>
+  <text x="32" y="39" font-family="SansSerif" font-size="20" font-weight="700" text-anchor="middle" fill="#ECFEFF">Go</text>
+</svg>

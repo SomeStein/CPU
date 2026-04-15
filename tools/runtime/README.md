@@ -1,27 +1,38 @@
 # Runtime Bundles
 
-The launcher checks these directories before falling back to system tools:
+`scripts/package.py` expects a fully populated runtime bundle for the current host under `tools/runtime/<host>/`.
 
-- `tools/runtime/macos-arm64/python/bin/python3`
-- `tools/runtime/macos-arm64/node/bin/node`
-- `tools/runtime/macos-arm64/ruby/bin/ruby`
-- `tools/runtime/macos-arm64/perl/bin/perl`
-- `tools/runtime/macos-arm64/java/bin/java`
-- `tools/runtime/macos-arm64/java/bin/javac`
-- `tools/runtime/macos-arm64/go/bin/go`
-- `tools/runtime/macos-arm64/rust/bin/rustc`
-- `tools/runtime/windows-x64/python/python.exe`
-- `tools/runtime/windows-x64/node/node.exe`
-- `tools/runtime/windows-x64/ruby/ruby.exe`
-- `tools/runtime/windows-x64/perl/perl.exe`
-- `tools/runtime/windows-x64/java/bin/java.exe`
-- `tools/runtime/windows-x64/java/bin/javac.exe`
-- `tools/runtime/windows-x64/go/bin/go.exe`
-- `tools/runtime/windows-x64/rust/bin/rustc.exe`
-
-Supported targets are:
+Supported hosts:
 
 - `macos-arm64`
 - `windows-x64`
 
-If you want fully self-contained fresh-clone execution, drop the matching runtime bundles into those paths. The current launchers already prefer them automatically, while compiled-language binaries can also be provided directly under `tools/bin/<host>/`.
+Expected runtime directories:
+
+- `tools/runtime/<host>/python`
+- `tools/runtime/<host>/node`
+- `tools/runtime/<host>/ruby`
+- `tools/runtime/<host>/perl`
+- `tools/runtime/<host>/java`
+- `tools/runtime/<host>/go`
+- `tools/runtime/<host>/rust`
+
+Expected executables:
+
+- `python/python.exe` or `python/bin/python3`
+- `node/node.exe` or `node/bin/node`
+- `ruby/ruby.exe` or `ruby/bin/ruby`
+- `perl/perl.exe` or `perl/bin/perl`
+- `java/bin/java(.exe)`
+- `java/bin/javac(.exe)`
+- `java/bin/jar(.exe)`
+- `java/bin/jpackage(.exe)`
+- `go/bin/go(.exe)`
+- `rust/bin/rustc(.exe)`
+
+Bundle checklist:
+
+- Record the exact version chosen for each runtime before producing a distribution build.
+- Keep one pinned version per host/runtime combination inside your release notes.
+- Prebuilt native workers belong in `tools/bin/<host>/`.
+- `tools/jars/java-worker.jar` is created during packaging and should not be hand-edited.

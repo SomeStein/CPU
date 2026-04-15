@@ -92,14 +92,15 @@ sub _host_arch {
 
 sub prepare_context {
   my ($case_data) = @_;
+  my $is_macos = _host_os() eq "macos";
   return {
     pid => $$,
     tid => 0,
     requested_priority_mode => $case_data->{priority_mode},
     requested_affinity_mode => $case_data->{affinity_mode},
-    applied_priority_mode => "unsupported",
-    applied_affinity_mode => $case_data->{affinity_mode} eq "single_core" ? "unsupported" : "unchanged",
-    scheduler_notes => "Perl runtime uses controller-side best effort scheduling only",
+    applied_priority_mode => $case_data->{priority_mode} eq "high" && $is_macos ? "advisory_macos" : "unsupported",
+    applied_affinity_mode => $case_data->{affinity_mode} eq "single_core" ? ($is_macos ? "advisory_macos" : "unsupported") : "unchanged",
+    scheduler_notes => $is_macos ? "Perl runtime uses controller-side best effort scheduling only; macOS affinity remains advisory" : "Perl runtime uses controller-side best effort scheduling only",
   };
 }
 

@@ -1,0 +1,11 @@
+run_id=run03_01_32_16_04_26
+profile_id=balanced
+implementation=go
+case_id=four_chains
+iterations=240000
+parallel_chains=4
+priority_mode=high
+affinity_mode=single_core
+timer_mode=monotonic_ns
+warmup=true
+repeat_index=1

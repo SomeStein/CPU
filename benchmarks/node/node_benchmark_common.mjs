@@ -56,14 +56,17 @@ export function loadCaseFile() {
 }
 
 export function prepareContext(priorityMode, affinityMode) {
+  const isMacos = process.platform === "darwin";
   return {
     pid: process.pid,
     tid: 0,
     requestedPriorityMode: priorityMode,
     requestedAffinityMode: affinityMode,
-    appliedPriorityMode: "unsupported",
-    appliedAffinityMode: affinityMode === "single_core" ? "unsupported" : "unchanged",
-    schedulerNotes: "Node runtime uses controller-side best effort only",
+    appliedPriorityMode: priorityMode === "high" && isMacos ? "advisory_macos" : "unsupported",
+    appliedAffinityMode: affinityMode === "single_core" ? (isMacos ? "advisory_macos" : "unsupported") : "unchanged",
+    schedulerNotes: isMacos
+      ? "Node runtime uses controller-side best effort only; macOS affinity remains advisory"
+      : "Node runtime uses controller-side best effort only",
     hostOs: process.platform === "darwin" ? "macos" : process.platform === "win32" ? "windows" : process.platform,
     hostArch: process.arch === "x64" ? "x64" : process.arch === "arm64" ? "arm64" : process.arch,
     runtimeName: "node",
@@ -84,13 +87,11 @@ export function buildResult({
   checksum,
 }) {
   const totalAdds = caseData.iterations * 2;
-  const language = implementation.startsWith("node_") ? "node" : "";
-  const variant = implementation.endsWith("optimized") ? "optimized" : "sloppy";
   return {
     schema_version: 1,
     implementation,
-    language,
-    variant,
+    language: "node",
+    variant: "default",
     case_id: caseData.caseId,
     warmup: caseData.warmup,
     repeat_index: caseData.repeatIndex,

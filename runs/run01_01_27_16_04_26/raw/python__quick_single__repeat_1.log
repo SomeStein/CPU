@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_01_27_16_04_26/cases/python__quick_single__repeat_1.case
+
+[stdout]
+{"applied_affinity_mode": "advisory_macos", "applied_priority_mode": "advisory_macos", "case_id": "quick_single", "elapsed_ns": 5862000, "host_arch": "arm64", "host_os": "macos", "implementation": "python", "iterations": 20000, "language": "python", "loop_trip_count": 20000, "ns_per_add": 146.55, "ns_per_iteration": 293.1, "parallel_chains": 1, "pid": 8244, "platform_extras": {}, "remainder": 0, "repeat_index": 1, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "8111950104458595269", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; macos: affinity advisory (apple silicon does not honor pinning); QoS set to user_interactive", "schema_version": 1, "tid": 21046066, "timer_kind": "perf_counter_ns", "variant": "default", "warmup": false}
+
+[stderr]

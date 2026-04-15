@@ -1,0 +1,11 @@
+run_id=run03_01_32_16_04_26
+profile_id=balanced
+implementation=c
+case_id=eight_chains
+iterations=480000
+parallel_chains=8
+priority_mode=high
+affinity_mode=single_core
+timer_mode=monotonic_ns
+warmup=true
+repeat_index=1

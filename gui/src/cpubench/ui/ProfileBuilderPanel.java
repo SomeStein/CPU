@@ -44,6 +44,7 @@ import cpubench.model.ProfileCaseDraft;
 import cpubench.model.ProfileDraft;
 import cpubench.model.ProfileOverrideDraft;
 import cpubench.model.TableData;
+import cpubench.ui.icons.LanguageIconRegistry;
 
 public final class ProfileBuilderPanel extends JPanel {
     private final BackendClient backend;
@@ -304,10 +305,11 @@ public final class ProfileBuilderPanel extends JPanel {
                 implementationChecklist.add(title);
                 currentLanguage = entry.language();
             }
-            JCheckBox box = new JCheckBox(entry.implementationId() + "  [" + entry.variant() + "]");
+            JCheckBox box = new JCheckBox(entry.displayName());
             box.setOpaque(false);
             box.setForeground(UiPalette.TEXT);
             box.setToolTipText(entry.description());
+            box.setIcon(LanguageIconRegistry.icon(entry.implementationId(), 16));
             box.addActionListener(event -> {
                 if (!applyingDraft) {
                     renderImplementationSummary();

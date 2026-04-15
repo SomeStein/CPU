@@ -10,6 +10,8 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.List;
 import javax.swing.JPanel;
 
+import cpubench.ui.icons.LanguageIconRegistry;
+
 public final class ImplementationBarChartPanel extends JPanel {
     public record Bar(String label, Color color, double value) {
     }
@@ -78,6 +80,7 @@ public final class ImplementationBarChartPanel extends JPanel {
             g2.setColor(UiPalette.TEXT);
             g2.drawString(String.format("%.2f", bar.value()), x, y - 6);
             g2.setColor(UiPalette.MUTED);
+            LanguageIconRegistry.icon(bar.label(), 16).paintIcon(this, g2, x + Math.max(0, barWidth / 2 - 8), chartBottom + 4);
             drawCentered(g2, abbreviate(bar.label(), 16), x + barWidth / 2, chartBottom + metrics.getHeight());
         }
         g2.setColor(UiPalette.MUTED);

@@ -11,6 +11,9 @@ import javax.swing.border.Border;
 import javax.swing.plaf.ColorUIResource;
 import javax.swing.plaf.FontUIResource;
 
+import cpubench.ui.shell.ModernTabbedPaneUI;
+import cpubench.ui.theme.ModernScrollBarUI;
+
 public final class DarkTheme {
     private DarkTheme() {
     }
@@ -62,10 +65,13 @@ public final class DarkTheme {
         setColor("ProgressBar.foreground", UiPalette.ACCENT);
         setColor("ScrollBar.thumb", UiPalette.BORDER);
         setColor("ScrollBar.track", UiPalette.PANEL);
+        setColor("ScrollBar.background", UiPalette.PANEL);
         setColor("SplitPane.background", UiPalette.WINDOW);
         setColor("SplitPaneDivider.background", UiPalette.WINDOW);
         setColor("ToolTip.background", UiPalette.SURFACE_ALT);
         setColor("ToolTip.foreground", UiPalette.TEXT);
+        UIManager.put("ScrollBar.width", 10);
+        UIManager.put("ScrollBarUI", ModernScrollBarUI.class.getName());
         UIManager.put("Component.focusWidth", 1);
         UIManager.put("Button.margin", new Insets(8, 12, 8, 12));
         UIManager.put("Button.arc", 16);
@@ -83,12 +89,12 @@ public final class DarkTheme {
     public static Border panelBorder() {
         return BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(UiPalette.BORDER, 1, true),
-            BorderFactory.createEmptyBorder(12, 12, 12, 12)
+            BorderFactory.createEmptyBorder(UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD)
         );
     }
 
     public static void styleTabbedPane(JTabbedPane pane) {
-        pane.setUI(new DeckTabbedPaneUI());
+        pane.setUI(new ModernTabbedPaneUI());
         pane.setBackground(UiPalette.WINDOW);
         pane.setForeground(UiPalette.TEXT);
         pane.setOpaque(false);

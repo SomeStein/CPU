@@ -11,6 +11,12 @@
 #include <windows.h>
 #else
 #include <pthread.h>
+#if defined(__APPLE__)
+#include <pthread/qos.h>
+#include <sys/qos.h>
+#include <sys/resource.h>
+extern int pthread_set_qos_class_self_np(qos_class_t, int);
+#endif
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -188,9 +194,18 @@ static Context prepare_context(const CaseData *case_data) {
     context.tid = tid;
     context.requested_priority_mode = case_data->priority_mode;
     context.requested_affinity_mode = case_data->affinity_mode;
-    context.applied_priority_mode = strcmp(case_data->priority_mode, "high") == 0 ? "advisory_macos" : "unchanged";
+    context.applied_priority_mode = "unchanged";
     context.applied_affinity_mode = strcmp(case_data->affinity_mode, "single_core") == 0 ? "advisory_macos" : "unchanged";
-    context.scheduler_notes = "macos: affinity/priority are advisory (apple silicon does not honor pinning)";
+#if defined(__APPLE__)
+    if (strcmp(case_data->priority_mode, "high") == 0) {
+        (void)setpriority(PRIO_PROCESS, 0, -5);
+        (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+        context.applied_priority_mode = "advisory_macos";
+    }
+    context.scheduler_notes = "macos: affinity is advisory (apple silicon does not honor pinning); QoS set to user_interactive";
+#else
+    context.scheduler_notes = "posix: affinity/priority are advisory only";
+#endif
     context.extra_value = 0;
     context.timer_kind = "clock_gettime_ns";
     return context;

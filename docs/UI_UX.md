@@ -2,57 +2,61 @@
 
 ## Design Direction
 
-The launch deck is intentionally a dark mission-control dashboard.
+CPU Lab now presents itself as a dark, editor-like shell instead of a hero-dashboard.
 
 Visual principles:
 
-- deep blue surfaces instead of flat black
-- cyan and teal accents for action and telemetry
-- generated icons instead of external asset dependencies
-- modular card sections with large breathable work areas
-- separate workspaces for configuration, monitoring, analysis, and inspection
+- dark navy surfaces with teal and amber accents
+- thin rounded scrollbars instead of native heavy chrome
+- activity-first navigation with a collapsible side panel
+- language-first visuals using colored SVG badges
+- charts and inspectors that favor direct manipulation over nested tabs
 
 ## Main Layout
 
-The controller is divided into three adaptive zones.
+The controller is divided into four zones.
 
-1. Hero header
-2. Sidebar
+1. Activity bar
+2. Side panel
 3. Workspace tabs
+4. Status bar
 
-### Hero Header
+### Activity Bar
 
-Contains:
+Contains one icon toggle per mode:
 
-- profile selector
-- primary run action
-- refresh action
-- docs action
-- status pill
-- progress bar
-- fullscreen hints and launch state
+- runs
+- analysis
+- monitor
+- artifacts
+- config
+- docs
 
-### Sidebar
+Clicking the active mode again collapses the side panel.
 
-Contains:
+### Side Panel
 
-- profile blueprint summary
-- selected run summary
-- run filters
-- global filters
+Contains mode-specific controls:
+
+- run search and stored run browser
+- run/global filters
+- live monitor summary and event tail
+- artifact shortcuts for the current selection
+- profile preview and builder shortcut
+- bundled documentation shortcuts
 
 ### Workspace Tabs
 
-Contains:
+Contains the large working surfaces:
 
-- run browser
-- custom run builder
-- per-run analysis
+- global overview
 - live monitor
-- global analysis
-- artifacts inspection
+- run configuration
+- on-demand run overview
+- on-demand artifact inspector
+- document tabs
 
-Each major task gets its own tab so graphs and tables have room instead of being squeezed onto one screen.
+Nested tabs were removed so each screen owns one clear layout.
 
 ## Custom Run Builder UX
 
@@ -62,8 +66,8 @@ Builder sections:
 
 - profile source and template picker
 - profile metadata
-- default scheduling/timing controls
-- grouped implementation selection
+- default scheduling and timing controls
+- icon-backed implementation selection
 - case matrix editor
 - per-implementation override table
 - validation and save/run feedback
@@ -94,12 +98,13 @@ Live monitoring must remain timing-safe.
 - graphs update from completed samples after they finish
 - logs shown in the UI come from controller events or stored raw logs
 
-The monitor views should emphasize:
+The monitor views emphasize:
 
 - run progress
 - active implementation and case
-- elapsed and latest metric context
-- event flow and persisted artifacts
+- latest metric context
+- controller event flow
+- persisted artifacts instead of in-loop telemetry
 
 ## Analysis UX
 
@@ -108,6 +113,7 @@ Analysis is intentionally split into per-run and global scopes.
 - run analysis focuses on the currently loaded run
 - global analysis compares stored results across runs
 - artifacts focus on one selected result row
+- charts support drag-pan and wheel zoom without native scrollbars
 
 This separation keeps filters understandable and gives each chart enough space to stay readable.
 

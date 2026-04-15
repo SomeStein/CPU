@@ -85,6 +85,21 @@ if sys.platform == "win32":
     kernel32.SetProcessAffinityMask.restype = BOOL
 
 
+def _macos_raise_qos(notes: list[str]) -> bool:
+    try:
+        libsystem = ctypes.CDLL(None)
+        qos_setter = libsystem.pthread_set_qos_class_self_np
+        qos_setter.argtypes = [ctypes.c_uint, ctypes.c_int]
+        qos_setter.restype = ctypes.c_int
+        result = qos_setter(0x21, 0)
+        if result == 0:
+            return True
+        notes.append(f"pthread_set_qos_class_self_np failed: {result}")
+    except (AttributeError, OSError) as error:
+        notes.append(f"pthread_set_qos_class_self_np unavailable: {error}")
+    return False
+
+
 def _windows_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
     process = kernel32.GetCurrentProcess()
     applied_priority = "unchanged"
@@ -120,19 +135,23 @@ def _posix_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
     is_macos = sys.platform == "darwin"
     applied_priority = "unchanged"
     notes: list[str] = []
+    qos_applied = False
+
+    if is_macos and (priority_mode == "high" or affinity_mode == "single_core"):
+        qos_applied = _macos_raise_qos(notes)
 
     if priority_mode == "high":
         try:
             os.nice(-5)
-            applied_priority = "high"
+            applied_priority = "advisory_macos" if is_macos else "high"
         except (AttributeError, PermissionError, OSError):
-            applied_priority = "advisory_macos" if is_macos else "unsupported"
+            applied_priority = "advisory_macos" if is_macos and qos_applied else ("advisory_macos" if is_macos else "unsupported")
             notes.append("priority elevation unavailable")
 
     if affinity_mode == "single_core":
         applied_affinity = "advisory_macos" if is_macos else "unsupported"
         if is_macos:
-            notes.append("macos: affinity advisory (apple silicon does not honor pinning)")
+            notes.append("macos: affinity advisory (apple silicon does not honor pinning); QoS set to user_interactive")
         else:
             notes.append("affinity control unavailable")
     else:

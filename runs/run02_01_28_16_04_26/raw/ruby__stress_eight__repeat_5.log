@@ -1,0 +1,7 @@
+[command]
+/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_01_28_16_04_26/cases/ruby__stress_eight__repeat_5.case
+
+[stdout]
+{"schema_version":1,"implementation":"ruby","language":"ruby","variant":"default","case_id":"stress_eight","warmup":false,"repeat_index":5,"iterations":1500000,"parallel_chains":8,"loop_trip_count":187500,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":865638000,"ns_per_iteration":577.092,"ns_per_add":288.546,"result_checksum":"11012296928664784958","host_os":"macos","host_arch":"arm64","pid":8723,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"advisory_macos","applied_affinity_mode":"advisory_macos","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only; macOS affinity remains advisory","runtime_name":"ruby","platform_extras":{}}
+
+[stderr]

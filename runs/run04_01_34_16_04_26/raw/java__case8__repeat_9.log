@@ -1,0 +1,7 @@
+[command]
+/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaWorker --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_01_34_16_04_26/cases/java__case8__repeat_9.case
+
+[stdout]
+{"schema_version":1,"implementation":"java","language":"java","variant":"default","case_id":"case8","warmup":false,"repeat_index":9,"iterations":10000000,"parallel_chains":1,"loop_trip_count":10000000,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":84019792,"ns_per_iteration":8.4019792,"ns_per_add":4.2009896,"result_checksum":"73837597962190917","host_os":"macos","host_arch":"arm64","pid":9556,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"advisory_macos","applied_affinity_mode":"advisory_macos","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only; macOS affinity remains advisory","runtime_name":"java","platform_extras":{}}
+
+[stderr]

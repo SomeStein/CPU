@@ -109,13 +109,13 @@ Main classes:
 - [`gui/src/cpubench/api/BackendClient.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/api/BackendClient.java)
 - [`gui/src/cpubench/model/ControllerState.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/model/ControllerState.java)
 - [`gui/src/cpubench/model/ProfileDraft.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/model/ProfileDraft.java)
-- [`gui/src/cpubench/ui/ControllerFrame.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/ControllerFrame.java)
+- [`gui/src/cpubench/ui/shell/ShellFrame.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/shell/ShellFrame.java)
 - [`gui/src/cpubench/ui/ProfileBuilderPanel.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/ProfileBuilderPanel.java)
 - [`gui/src/cpubench/ui/DarkTheme.java`](/Users/aaronpumm/Desktop/Projekte%20Lokal/GitHub/Testing/CPU/gui/src/cpubench/ui/DarkTheme.java)
 
 Responsibilities:
 
-- present the launch deck and history browser
+- present the activity-bar shell and workspace tabs
 - expose built-in and custom profiles
 - provide the custom run builder
 - stream phase-boundary events during active runs
@@ -129,8 +129,9 @@ Responsibilities:
 3. The suite expands the profile into case files.
 4. Each implementation runs as an isolated worker process.
 5. The worker emits exactly one final JSON payload.
-6. The suite writes raw logs, result rows, and phase-boundary events after process exit.
-7. The GUI reloads stored runs, results, events, and manifests through `controller_api.py`.
+6. On Windows, the suite launches workers suspended, applies process-wide affinity and priority, then resumes the primary thread.
+7. The suite writes raw logs, result rows, and phase-boundary events after process exit.
+8. The GUI reloads stored runs, results, events, and manifests through `controller_api.py`.
 
 ## Persisted Formats
 

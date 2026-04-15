@@ -150,9 +150,15 @@ fn build_result(
     let total_adds = case_data.iterations * 2;
     let host_os = if cfg!(target_os = "macos") { "macos" } else if cfg!(target_os = "windows") { "windows" } else { "unknown" };
     let host_arch = if cfg!(target_arch = "aarch64") { "arm64" } else if cfg!(target_arch = "x86_64") { "x64" } else { "unknown" };
-    let applied_affinity = if case_data.affinity_mode == "single_core" { "unsupported" } else { "unchanged" };
+    let is_macos = cfg!(target_os = "macos");
+    let applied_priority = if case_data.priority_mode == "high" && is_macos { "advisory_macos" } else { "unsupported" };
+    let applied_affinity = if case_data.affinity_mode == "single_core" {
+        if is_macos { "advisory_macos" } else { "unsupported" }
+    } else {
+        "unchanged"
+    };
     format!(
-        "{{\"schema_version\":1,\"implementation\":\"{implementation}\",\"language\":\"rust\",\"variant\":\"{variant}\",\"case_id\":\"{case_id}\",\"warmup\":{warmup},\"repeat_index\":{repeat_index},\"iterations\":{iterations},\"parallel_chains\":{parallel_chains},\"loop_trip_count\":{loop_trip_count},\"remainder\":{remainder},\"timer_kind\":\"instant_ns\",\"elapsed_ns\":{elapsed_ns},\"ns_per_iteration\":{ns_per_iteration},\"ns_per_add\":{ns_per_add},\"result_checksum\":\"{checksum}\",\"host_os\":\"{host_os}\",\"host_arch\":\"{host_arch}\",\"pid\":{pid},\"tid\":0,\"requested_priority_mode\":\"{priority_mode}\",\"requested_affinity_mode\":\"{affinity_mode}\",\"applied_priority_mode\":\"unsupported\",\"applied_affinity_mode\":\"{applied_affinity}\",\"scheduler_notes\":\"Rust benchmark uses controller-side best effort scheduling only\",\"runtime_name\":\"rust\",\"platform_extras\":{{}}}}",
+        "{{\"schema_version\":1,\"implementation\":\"{implementation}\",\"language\":\"rust\",\"variant\":\"{variant}\",\"case_id\":\"{case_id}\",\"warmup\":{warmup},\"repeat_index\":{repeat_index},\"iterations\":{iterations},\"parallel_chains\":{parallel_chains},\"loop_trip_count\":{loop_trip_count},\"remainder\":{remainder},\"timer_kind\":\"instant_ns\",\"elapsed_ns\":{elapsed_ns},\"ns_per_iteration\":{ns_per_iteration},\"ns_per_add\":{ns_per_add},\"result_checksum\":\"{checksum}\",\"host_os\":\"{host_os}\",\"host_arch\":\"{host_arch}\",\"pid\":{pid},\"tid\":0,\"requested_priority_mode\":\"{priority_mode}\",\"requested_affinity_mode\":\"{affinity_mode}\",\"applied_priority_mode\":\"{applied_priority}\",\"applied_affinity_mode\":\"{applied_affinity}\",\"scheduler_notes\":\"{scheduler_notes}\",\"runtime_name\":\"rust\",\"platform_extras\":{{}}}}",
         implementation = implementation,
         variant = variant,
         case_id = escape_json(&case_data.case_id),
@@ -171,7 +177,13 @@ fn build_result(
         pid = std::process::id(),
         priority_mode = escape_json(&case_data.priority_mode),
         affinity_mode = escape_json(&case_data.affinity_mode),
+        applied_priority = applied_priority,
         applied_affinity = applied_affinity,
+        scheduler_notes = escape_json(if is_macos {
+            "Rust benchmark uses controller-side best effort scheduling only; macOS affinity remains advisory"
+        } else {
+            "Rust benchmark uses controller-side best effort scheduling only"
+        }),
     )
 }
 

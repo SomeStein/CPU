@@ -1,0 +1,59 @@
+{
+  "host_arch": "arm64",
+  "host_os": "macos",
+  "profile": {
+    "defaults": {
+      "affinity_mode": "single_core",
+      "priority_mode": "high",
+      "repeats": 5,
+      "timer_mode": "monotonic_ns",
+      "warmups": 3
+    },
+    "id": "stress",
+    "implementations": [
+      "c",
+      "cpp",
+      "rust",
+      "go",
+      "java",
+      "node",
+      "python",
+      "ruby",
+      "perl"
+    ],
+    "matrix": [
+      {
+        "case_id": "stress_single",
+        "iterations": 200000,
+        "parallel_chains": 1
+      },
+      {
+        "case_id": "stress_two",
+        "iterations": 400000,
+        "parallel_chains": 2
+      },
+      {
+        "case_id": "stress_four",
+        "iterations": 750000,
+        "parallel_chains": 4
+      },
+      {
+        "case_id": "stress_eight",
+        "iterations": 1500000,
+        "parallel_chains": 8
+      },
+      {
+        "case_id": "stress_sixteen",
+        "iterations": 3000000,
+        "parallel_chains": 16
+      }
+    ],
+    "name": "Stress"
+  },
+  "profile_path": "testruns/stress.testrun.json",
+  "profile_source": "builtin",
+  "run_id": "run02_01_28_16_04_26",
+  "run_number": 2,
+  "schema_version": 1,
+  "started_at": "2026-04-16T01:28:05"
+}

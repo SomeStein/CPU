@@ -1,0 +1,7 @@
+[command]
+/Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/bin/macos-arm64/c --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run03_01_32_16_04_26/cases/c__single_chain__repeat_2.case
+
+[stdout]
+{"schema_version":1,"implementation":"c","language":"c","variant":"default","case_id":"single_chain","warmup":false,"repeat_index":2,"iterations":80000,"parallel_chains":1,"loop_trip_count":80000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":359000,"ns_per_iteration":4.487500,"ns_per_add":2.243750,"result_checksum":"9186729751396195397","host_os":"macos","host_arch":"arm64","pid":9023,"tid":8235830272,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"advisory_macos","applied_affinity_mode":"advisory_macos","scheduler_notes":"macos: affinity is advisory (apple silicon does not honor pinning); QoS set to user_interactive","runtime_name":"c","platform_extras":{"counter_frequency":0}}
+
+[stderr]

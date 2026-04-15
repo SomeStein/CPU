@@ -1,0 +1,8 @@
+[command]
+/usr/bin/perl /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/perl.pl --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_01_34_16_04_26/cases/perl__case7__repeat_2.case
+
+[stdout]
+{"repeat_index":2,"runtime_name":"perl","ns_per_iteration":792.351,"timer_kind":"clock_gettime_ns","tid":0,"platform_extras":{},"requested_priority_mode":"high","schema_version":1,"requested_affinity_mode":"single_core","case_id":"case7","pid":9786,"applied_affinity_mode":"advisory_macos","host_arch":"unknown","remainder":0,"applied_priority_mode":"advisory_macos","scheduler_notes":"Perl runtime uses controller-side best effort scheduling only; macOS affinity remains advisory","elapsed_ns":792351000,"variant":"default","parallel_chains":1,"language":"perl","loop_trip_count":1000000,"iterations":1000000,"host_os":"macos","warmup":false,"implementation":"perl","ns_per_add":396.1755,"result_checksum":"0"}
+
+[stderr]
+Hexadecimal number > 0xffffffff non-portable at /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/BenchmarkCommon.pm line 19.

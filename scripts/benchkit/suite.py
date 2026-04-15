@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +30,44 @@ from .runtimes import ResolvedTool, resolve_tool
 
 
 EventCallback = Callable[[dict[str, str]], None]
+
+
+if sys.platform == "win32":
+    CREATE_SUSPENDED = 0x00000004
+    HIGH_PRIORITY_CLASS = 0x00000080
+    TH32CS_SNAPTHREAD = 0x00000004
+    THREAD_SUSPEND_RESUME = 0x0002
+    THREAD_QUERY_INFORMATION = 0x0040
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+    class THREADENTRY32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", ctypes.c_uint32),
+            ("cntUsage", ctypes.c_uint32),
+            ("th32ThreadID", ctypes.c_uint32),
+            ("th32OwnerProcessID", ctypes.c_uint32),
+            ("tpBasePri", ctypes.c_int32),
+            ("tpDeltaPri", ctypes.c_int32),
+            ("dwFlags", ctypes.c_uint32),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.SetProcessAffinityMask.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+    kernel32.SetProcessAffinityMask.restype = ctypes.c_int
+    kernel32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    kernel32.SetPriorityClass.restype = ctypes.c_int
+    kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    kernel32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    kernel32.Thread32First.argtypes = [ctypes.c_void_p, ctypes.POINTER(THREADENTRY32)]
+    kernel32.Thread32First.restype = ctypes.c_int
+    kernel32.Thread32Next.argtypes = [ctypes.c_void_p, ctypes.POINTER(THREADENTRY32)]
+    kernel32.Thread32Next.restype = ctypes.c_int
+    kernel32.OpenThread.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    kernel32.OpenThread.restype = ctypes.c_void_p
+    kernel32.ResumeThread.argtypes = [ctypes.c_void_p]
+    kernel32.ResumeThread.restype = ctypes.c_uint32
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
 
 
 @dataclass(frozen=True)
@@ -225,6 +265,58 @@ def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:
     return resolve_tool(entry.runtime_kind, required=False)
 
 
+def _resume_primary_thread(pid: int) -> None:
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+    if snapshot == INVALID_HANDLE_VALUE:
+        raise OSError(ctypes.get_last_error(), "CreateToolhelp32Snapshot failed")
+    try:
+        entry = THREADENTRY32()
+        entry.dwSize = ctypes.sizeof(THREADENTRY32)
+        has_entry = kernel32.Thread32First(snapshot, ctypes.byref(entry))
+        while has_entry:
+            if entry.th32OwnerProcessID == pid:
+                thread = kernel32.OpenThread(THREAD_SUSPEND_RESUME | THREAD_QUERY_INFORMATION, False, entry.th32ThreadID)
+                if not thread:
+                    raise OSError(ctypes.get_last_error(), "OpenThread failed")
+                try:
+                    if kernel32.ResumeThread(thread) == 0xFFFFFFFF:
+                        raise OSError(ctypes.get_last_error(), "ResumeThread failed")
+                    return
+                finally:
+                    kernel32.CloseHandle(thread)
+            has_entry = kernel32.Thread32Next(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    raise RuntimeError(f"No primary thread found for pid {pid}")
+
+
+def _spawn_pinned(command: list[str], *, case_values: dict[str, object]) -> subprocess.Popen[str]:
+    if sys.platform != "win32":
+        return subprocess.Popen(command, cwd=ROOT_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    process = subprocess.Popen(
+        command,
+        cwd=ROOT_DIR,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        creationflags=CREATE_SUSPENDED,
+    )
+    process_handle = ctypes.c_void_p(process._handle)
+    try:
+        if case_values.get("affinity_mode") == "single_core":
+            if not kernel32.SetProcessAffinityMask(process_handle, 1):
+                raise OSError(ctypes.get_last_error(), "SetProcessAffinityMask failed")
+        if case_values.get("priority_mode") == "high":
+            if not kernel32.SetPriorityClass(process_handle, HIGH_PRIORITY_CLASS):
+                raise OSError(ctypes.get_last_error(), "SetPriorityClass failed")
+        _resume_primary_thread(process.pid)
+    except Exception:
+        process.kill()
+        process.wait(timeout=5)
+        raise
+    return process
+
+
 def _command_for_entry(entry: ImplementationEntry, runtime: ResolvedTool, case_file: Path, java_output_dir: Path) -> list[str]:
     if entry.runner_kind == "native-binary":
         if runtime.source == "missing" or not runtime.path.exists():
@@ -354,8 +446,10 @@ def _execute_case(
     )
 
     try:
-        completed = subprocess.run(command, cwd=ROOT_DIR, capture_output=True, text=True, check=False)
-        raw_log_text = f"[command]\n{' '.join(command)}\n\n[stdout]\n{completed.stdout}\n[stderr]\n{completed.stderr}"
+        process = _spawn_pinned(command, case_values=case_values)
+        stdout, stderr = process.communicate()
+        returncode = process.returncode
+        raw_log_text = f"[command]\n{' '.join(command)}\n\n[stdout]\n{stdout}\n[stderr]\n{stderr}"
         raw_log_path.write_text(raw_log_text, encoding="utf-8")
     except Exception as error:
         raw_log_path.write_text(f"[command]\n{' '.join(command)}\n\n[start-error]\n{error}\n", encoding="utf-8")
@@ -375,9 +469,9 @@ def _execute_case(
         return
 
     row = dict(base_row)
-    if completed.returncode == 0:
+    if returncode == 0:
         try:
-            payload = json.loads(completed.stdout.strip())
+            payload = json.loads(stdout.strip())
             row.update(
                 {
                     "loop_trip_count": stringify(payload.get("loop_trip_count", "")),
@@ -399,7 +493,7 @@ def _execute_case(
         except json.JSONDecodeError as exc:
             row["error_message"] = f"Invalid JSON output: {exc}"
     else:
-        row["error_message"] = completed.stderr.strip() or completed.stdout.strip() or f"Exit code {completed.returncode}"
+        row["error_message"] = stderr.strip() or stdout.strip() or f"Exit code {returncode}"
 
     _append_result_and_event(
         row=row,

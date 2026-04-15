@@ -1,4 +1,4 @@
-# CPU Benchmark Launch Deck
+# CPU Lab
 
 This repository is a self-hosted benchmark lab for `windows-x64` and `macos-arm64`.
 
@@ -34,33 +34,23 @@ The repo is now split into explicit source domains for maintainability:
 
 ## Benchmark Suite
 
-The suite currently includes these implementations:
+The suite now exposes one canonical implementation per language:
 
-- `c_native`
-- `python_sloppy`
-- `python_optimized`
-- `node_sloppy`
-- `node_optimized`
-- `java_sloppy`
-- `java_optimized`
-- `ruby_sloppy`
-- `ruby_optimized`
-- `perl_sloppy`
-- `perl_optimized`
-- `cpp_sloppy`
-- `cpp_optimized`
-- `go_sloppy`
-- `go_optimized`
-- `rust_sloppy`
-- `rust_optimized`
+- `c`
+- `cpp`
+- `rust`
+- `go`
+- `java`
+- `node`
+- `python`
+- `ruby`
+- `perl`
 
 Built-in profiles include:
 
 - `smoke`
 - `balanced`
 - `stress`
-- `polyglot_smoke`
-- `polyglot_balanced`
 
 Custom profiles are saved as `.testrun.json` files under [`testruns/custom/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/testruns/custom>).
 
@@ -80,15 +70,14 @@ python3 scripts/analyze_runs.py
 
 ## GUI Overview
 
-The Swing app is a dark mission-control dashboard with:
+The Swing app is now a VSCode-style dark shell with:
 
-- fullscreen-aware launch behavior with `F11` / `Esc`
-- run browser and per-run analysis
-- live controller-side monitoring
-- global cross-run analysis
-- a dedicated custom run builder
-- raw log and manifest inspection
-- in-app repo documentation
+- an activity rail that swaps side-panel modes
+- a hideable side panel for runs, filters, monitor context, artifacts, profiles, and docs
+- single-row workspace tabs in the center
+- interactive metric charts with hover details, pan, and zoom
+- colored language icons across tables, builders, legends, and tooltips
+- raw log and manifest inspection backed by stored artifacts only
 
 Main GUI entrypoint:
 
@@ -135,7 +124,7 @@ Global tracked history starts in:
 
 ## Runtime Bundles
 
-The launcher prefers repo-local runtimes first and falls back to system tools when bundles are not present.
+The launcher prefers repo-local runtimes first and falls back to system tools when bundles are not present. `scripts/package.py` builds host-native bundles from the same layout.
 
 Bundle layout:
 

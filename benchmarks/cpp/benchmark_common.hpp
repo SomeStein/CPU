@@ -13,6 +13,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
+#include <pthread/qos.h>
 #include <unistd.h>
 #endif
 
@@ -134,9 +135,20 @@ inline Context prepare_context(const CaseData& case_data) {
 #endif
     context.requested_priority_mode = case_data.priority_mode;
     context.requested_affinity_mode = case_data.affinity_mode;
+#if defined(__APPLE__)
+    if (case_data.priority_mode == "high") {
+        pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+        context.applied_priority_mode = "advisory_macos";
+    } else {
+        context.applied_priority_mode = "unsupported";
+    }
+    context.applied_affinity_mode = case_data.affinity_mode == "single_core" ? "advisory_macos" : "unchanged";
+    context.scheduler_notes = "C++ benchmark uses controller-side best effort scheduling only; macOS affinity remains advisory";
+#else
     context.applied_priority_mode = "unsupported";
     context.applied_affinity_mode = case_data.affinity_mode == "single_core" ? "unsupported" : "unchanged";
     context.scheduler_notes = "C++ benchmark uses controller-side best effort scheduling only";
+#endif
     return context;
 }
 

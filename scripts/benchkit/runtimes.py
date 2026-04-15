@@ -69,6 +69,24 @@ def _tool_candidates(name: str) -> list[Path]:
                 runtime_dir / "jdk" / "bin" / "javac",
             ]
         )
+    elif name == "jar":
+        candidates.extend(
+            [
+                runtime_dir / "java" / "bin" / "jar.exe",
+                runtime_dir / "java" / "bin" / "jar",
+                runtime_dir / "jdk" / "bin" / "jar.exe",
+                runtime_dir / "jdk" / "bin" / "jar",
+            ]
+        )
+    elif name == "jpackage":
+        candidates.extend(
+            [
+                runtime_dir / "java" / "bin" / "jpackage.exe",
+                runtime_dir / "java" / "bin" / "jpackage",
+                runtime_dir / "jdk" / "bin" / "jpackage.exe",
+                runtime_dir / "jdk" / "bin" / "jpackage",
+            ]
+        )
     elif name == "go":
         candidates.extend(
             [

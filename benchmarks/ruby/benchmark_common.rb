@@ -69,14 +69,15 @@ module BenchmarkCommon
   end
 
   def prepare_context(case_data)
+    is_macos = host_os == "macos"
     {
       "pid" => Process.pid,
       "tid" => 0,
       "requested_priority_mode" => case_data["priority_mode"],
       "requested_affinity_mode" => case_data["affinity_mode"],
-      "applied_priority_mode" => "unsupported",
-      "applied_affinity_mode" => case_data["affinity_mode"] == "single_core" ? "unsupported" : "unchanged",
-      "scheduler_notes" => "Ruby runtime uses controller-side best effort scheduling only",
+      "applied_priority_mode" => case_data["priority_mode"] == "high" && is_macos ? "advisory_macos" : "unsupported",
+      "applied_affinity_mode" => case_data["affinity_mode"] == "single_core" ? (is_macos ? "advisory_macos" : "unsupported") : "unchanged",
+      "scheduler_notes" => is_macos ? "Ruby runtime uses controller-side best effort scheduling only; macOS affinity remains advisory" : "Ruby runtime uses controller-side best effort scheduling only",
     }
   end
 

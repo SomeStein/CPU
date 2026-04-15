@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_01_28_16_04_26/cases/python__stress_two__repeat_4.case
+
+[stdout]
+{"applied_affinity_mode": "advisory_macos", "applied_priority_mode": "advisory_macos", "case_id": "stress_two", "elapsed_ns": 98187583, "host_arch": "arm64", "host_os": "macos", "implementation": "python", "iterations": 400000, "language": "python", "loop_trip_count": 200000, "ns_per_add": 122.73447875, "ns_per_iteration": 245.4689575, "parallel_chains": 2, "pid": 8525, "platform_extras": {}, "remainder": 0, "repeat_index": 4, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "13819576793050185674", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; macos: affinity advisory (apple silicon does not honor pinning); QoS set to user_interactive", "schema_version": 1, "tid": 21048734, "timer_kind": "perf_counter_ns", "variant": "default", "warmup": false}
+
+[stderr]

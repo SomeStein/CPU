@@ -2,30 +2,27 @@
   "defaults": {
     "affinity_mode": "single_core",
     "priority_mode": "high",
-    "repeats": 1,
+    "repeats": 2,
     "timer_mode": "monotonic_ns",
     "warmups": 1
   },
   "id": "smoke",
   "implementations": [
-    "c_native",
-    "python_sloppy",
-    "python_optimized",
-    "node_sloppy",
-    "node_optimized",
-    "java_sloppy",
-    "java_optimized"
+    "c",
+    "cpp",
+    "rust",
+    "go",
+    "java",
+    "node",
+    "python",
+    "ruby",
+    "perl"
   ],
   "matrix": [
     {
       "case_id": "quick_single",
       "iterations": 20000,
       "parallel_chains": 1
-    },
-    {
-      "case_id": "quick_parallel",
-      "iterations": 40000,
-      "parallel_chains": 4
     }
   ],
   "name": "Smoke"

@@ -1,0 +1,11 @@
+run_id=run03_01_32_16_04_26
+profile_id=balanced
+implementation=rust
+case_id=single_chain
+iterations=80000
+parallel_chains=1
+priority_mode=high
+affinity_mode=single_core
+timer_mode=monotonic_ns
+warmup=false
+repeat_index=2

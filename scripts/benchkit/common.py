@@ -33,23 +33,15 @@ TOOLS_BIN_DIR = TOOLS_DIR / "bin"
 RUN_DIR_PATTERN = re.compile(r"^run(?P<number>\d+)_(?P<stamp>\d{2}_\d{2}_\d{2}_\d{2}_\d{2})$")
 
 IMPLEMENTATION_METADATA = {
-    "c_native": {"language": "c", "variant": "native"},
-    "cpp_sloppy": {"language": "cpp", "variant": "sloppy"},
-    "cpp_optimized": {"language": "cpp", "variant": "optimized"},
-    "go_sloppy": {"language": "go", "variant": "sloppy"},
-    "go_optimized": {"language": "go", "variant": "optimized"},
-    "java_sloppy": {"language": "java", "variant": "sloppy"},
-    "java_optimized": {"language": "java", "variant": "optimized"},
-    "python_sloppy": {"language": "python", "variant": "sloppy"},
-    "python_optimized": {"language": "python", "variant": "optimized"},
-    "node_sloppy": {"language": "node", "variant": "sloppy"},
-    "node_optimized": {"language": "node", "variant": "optimized"},
-    "perl_sloppy": {"language": "perl", "variant": "sloppy"},
-    "perl_optimized": {"language": "perl", "variant": "optimized"},
-    "ruby_sloppy": {"language": "ruby", "variant": "sloppy"},
-    "ruby_optimized": {"language": "ruby", "variant": "optimized"},
-    "rust_sloppy": {"language": "rust", "variant": "sloppy"},
-    "rust_optimized": {"language": "rust", "variant": "optimized"},
+    "c": {"language": "c", "variant": "default", "display_name": "C", "group": "native", "color": "#A8B9CC"},
+    "cpp": {"language": "cpp", "variant": "default", "display_name": "C++", "group": "native", "color": "#659AD2"},
+    "go": {"language": "go", "variant": "default", "display_name": "Go", "group": "native", "color": "#00ADD8"},
+    "java": {"language": "java", "variant": "default", "display_name": "Java", "group": "managed", "color": "#EA2D2E"},
+    "node": {"language": "node", "variant": "default", "display_name": "Node.js", "group": "managed", "color": "#5FA04E"},
+    "perl": {"language": "perl", "variant": "default", "display_name": "Perl", "group": "script", "color": "#39457E"},
+    "python": {"language": "python", "variant": "default", "display_name": "Python", "group": "script", "color": "#3776AB"},
+    "ruby": {"language": "ruby", "variant": "default", "display_name": "Ruby", "group": "script", "color": "#CC342D"},
+    "rust": {"language": "rust", "variant": "default", "display_name": "Rust", "group": "native", "color": "#DEA584"},
 }
 
 RESULT_FIELD_ORDER = [
@@ -205,7 +197,10 @@ def parse_key_value_text(text: str) -> dict[str, str]:
 
 
 def implementation_metadata(implementation: str) -> dict[str, str]:
-    return IMPLEMENTATION_METADATA.get(implementation, {"language": "", "variant": ""})
+    return IMPLEMENTATION_METADATA.get(
+        implementation,
+        {"language": "", "variant": "", "display_name": "", "group": "", "color": ""},
+    )
 
 
 def metric_value(row: dict[str, str]) -> tuple[str, str]:
