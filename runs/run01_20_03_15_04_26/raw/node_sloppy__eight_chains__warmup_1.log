@@ -1,7 +1,0 @@
-[command]
-/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/node_sloppy.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_20_03_15_04_26/cases/node_sloppy__eight_chains__warmup_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"node_sloppy","language":"node","variant":"sloppy","case_id":"eight_chains","warmup":true,"repeat_index":1,"iterations":120000,"parallel_chains":8,"loop_trip_count":15000,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":19377250,"ns_per_iteration":161.47708333333333,"ns_per_add":80.73854166666666,"result_checksum":"8666136643843488542","host_os":"macos","host_arch":"arm64","pid":183,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"Node runtime uses controller-side best effort only","runtime_name":"node","platform_extras":{}}
-
-[stderr]

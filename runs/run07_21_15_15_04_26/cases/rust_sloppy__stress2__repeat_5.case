@@ -1,0 +1,11 @@
+run_id=run07_21_15_15_04_26
+profile_id=stress2
+implementation=rust_sloppy
+case_id=stress2
+iterations=100000
+parallel_chains=1
+priority_mode=high
+affinity_mode=unchanged
+timer_mode=monotonic_ns
+warmup=false
+repeat_index=5

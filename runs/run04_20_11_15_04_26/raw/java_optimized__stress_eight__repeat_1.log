@@ -1,7 +1,0 @@
-[command]
-/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaOptimized --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_20_11_15_04_26/cases/java_optimized__stress_eight__repeat_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"java_optimized","language":"java","variant":"optimized","case_id":"stress_eight","warmup":false,"repeat_index":1,"iterations":1500000,"parallel_chains":8,"loop_trip_count":187500,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":6572125,"ns_per_iteration":4.3814166666666665,"ns_per_add":2.1907083333333333,"result_checksum":"11012296928664784958","host_os":"macos","host_arch":"arm64","pid":891,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"high","applied_affinity_mode":"unsupported","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only","runtime_name":"java","platform_extras":{}}
-
-[stderr]

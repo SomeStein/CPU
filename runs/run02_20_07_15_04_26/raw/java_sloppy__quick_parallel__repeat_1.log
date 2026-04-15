@@ -1,7 +1,0 @@
-[command]
-/usr/bin/java -cp /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/build/java bench.JavaSloppy --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_20_07_15_04_26/cases/java_sloppy__quick_parallel__repeat_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"java_sloppy","language":"java","variant":"sloppy","case_id":"quick_parallel","warmup":false,"repeat_index":1,"iterations":40000,"parallel_chains":4,"loop_trip_count":10000,"remainder":0,"timer_kind":"system_nano_time","elapsed_ns":2433041,"ns_per_iteration":60.826025,"ns_per_add":30.4130125,"result_checksum":"9095820053878083041","host_os":"macos","host_arch":"arm64","pid":394,"tid":1,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"high","applied_affinity_mode":"unsupported","scheduler_notes":"Java benchmark uses controller-side best effort scheduling only","runtime_name":"java","platform_extras":{}}
-
-[stderr]

@@ -1,7 +1,0 @@
-[command]
-/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby_sloppy.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run06_20_46_15_04_26/cases/ruby_sloppy__quick_single__warmup_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"ruby_sloppy","language":"ruby","variant":"sloppy","case_id":"quick_single","warmup":true,"repeat_index":1,"iterations":4000,"parallel_chains":1,"loop_trip_count":4000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":2170000,"ns_per_iteration":542.5,"ns_per_add":271.25,"result_checksum":"16127785005222626245","host_os":"macos","host_arch":"arm64","pid":24611,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only","runtime_name":"ruby","platform_extras":{}}
-
-[stderr]

@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python_optimized.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/python_optimized__stress3__repeat_13.case
+
+[stdout]
+{"applied_affinity_mode": "unchanged", "applied_priority_mode": "unsupported", "case_id": "stress3", "elapsed_ns": 307476625, "host_arch": "arm64", "host_os": "macos", "implementation": "python_optimized", "iterations": 1000000, "language": "python", "loop_trip_count": 1000000, "ns_per_add": 153.7383125, "ns_per_iteration": 307.476625, "parallel_chains": 1, "pid": 48873, "platform_extras": {}, "remainder": 0, "repeat_index": 13, "requested_affinity_mode": "unchanged", "requested_priority_mode": "high", "result_checksum": "3327103073201887045", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable", "schema_version": 1, "tid": 20825262, "timer_kind": "perf_counter_ns", "variant": "optimized", "warmup": false}
+
+[stderr]

@@ -1,0 +1,8 @@
+[command]
+/usr/bin/perl /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/perl_sloppy.pl --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/perl_sloppy__stress5__repeat_18.case
+
+[stdout]
+{"parallel_chains":4,"applied_affinity_mode":"unchanged","warmup":false,"iterations":100000000,"scheduler_notes":"Perl runtime uses controller-side best effort scheduling only","remainder":0,"repeat_index":18,"implementation":"perl_sloppy","applied_priority_mode":"unsupported","language":"perl","host_os":"macos","timer_kind":"clock_gettime_ns","loop_trip_count":25000000,"pid":48754,"host_arch":"unknown","tid":0,"ns_per_iteration":625.91612998,"requested_affinity_mode":"unchanged","schema_version":1,"elapsed_ns":62591612998,"ns_per_add":312.95806499,"requested_priority_mode":"high","result_checksum":"0","case_id":"stress5","platform_extras":{},"runtime_name":"perl","variant":"sloppy"}
+
+[stderr]
+Hexadecimal number > 0xffffffff non-portable at /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl/BenchmarkCommon.pm line 19.

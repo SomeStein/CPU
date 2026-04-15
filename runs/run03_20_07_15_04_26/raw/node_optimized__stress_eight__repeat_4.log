@@ -1,7 +1,0 @@
-[command]
-/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/node_optimized.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run03_20_07_15_04_26/cases/node_optimized__stress_eight__repeat_4.case
-
-[stdout]
-{"schema_version":1,"implementation":"node_optimized","language":"node","variant":"optimized","case_id":"stress_eight","warmup":false,"repeat_index":4,"iterations":1500000,"parallel_chains":8,"loop_trip_count":187500,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":137844500,"ns_per_iteration":91.89633333333333,"ns_per_add":45.948166666666665,"result_checksum":"11012296928664784958","host_os":"macos","host_arch":"arm64","pid":577,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"unsupported","applied_affinity_mode":"unsupported","scheduler_notes":"Node runtime uses controller-side best effort only","runtime_name":"node","platform_extras":{}}
-
-[stderr]

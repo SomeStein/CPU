@@ -1,0 +1,7 @@
+[command]
+/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby_optimized.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run07_21_15_15_04_26/cases/ruby_optimized__stress3__repeat_2.case
+
+[stdout]
+{"schema_version":1,"implementation":"ruby_optimized","language":"ruby","variant":"optimized","case_id":"stress3","warmup":false,"repeat_index":2,"iterations":1000000,"parallel_chains":1,"loop_trip_count":1000000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":587071000,"ns_per_iteration":587.071,"ns_per_add":293.5355,"result_checksum":"3327103073201887045","host_os":"macos","host_arch":"arm64","pid":49614,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"unchanged","applied_priority_mode":"unsupported","applied_affinity_mode":"unchanged","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only","runtime_name":"ruby","platform_extras":{}}
+
+[stderr]
