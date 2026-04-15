@@ -1,29 +1,33 @@
+from __future__ import annotations
+
 from benchmark_common import (
-    DEFAULT_AFFINITY_MASK,
-    emit_record,
-    get_current_processor_number,
-    get_positive_int_from_env,
+    build_result,
+    emit_result_json,
+    extend_seed_pairs,
+    load_case_from_argv,
     mask_u64,
-    prepare_thread_context,
-    query_thread_cycle_time,
+    monotonic_ns,
+    prepare_process_context,
 )
 
 
-def main() -> int:
-    iterations = get_positive_int_from_env("PY_OPT_ITERATIONS", 20_000_000)
-    parallel_chains = 4
-    loop_trip_count = iterations // parallel_chains
-    remainder = iterations % parallel_chains
-    adds_per_iteration = 2
+def _run_generic(loop_trip_count: int, remainder: int, parallel_chains: int) -> int:
+    states = [[left, right] for left, right in extend_seed_pairs(parallel_chains)]
+    for _ in range(loop_trip_count):
+        for state in states:
+            state[0] = mask_u64(state[0] + state[1])
+            state[1] = mask_u64(state[0] + state[1])
+    for _ in range(remainder):
+        states[0][0] = mask_u64(states[0][0] + states[0][1])
+        states[0][1] = mask_u64(states[0][0] + states[0][1])
+    checksum = 0
+    for left, right in states:
+        checksum ^= left ^ right
+    return checksum
 
-    context = prepare_thread_context(DEFAULT_AFFINITY_MASK)
-    a0, b0 = 1, 1
-    a1, b1 = 3, 5
-    a2, b2 = 8, 13
-    a3, b3 = 21, 34
-    cpu_before = get_current_processor_number()
-    counter_start = query_thread_cycle_time(context["thread"])
 
+def _run_four(loop_trip_count: int, remainder: int) -> int:
+    (a0, b0), (a1, b1), (a2, b2), (a3, b3) = extend_seed_pairs(4)
     for _ in range(loop_trip_count):
         a0 = mask_u64(a0 + b0)
         b0 = mask_u64(a0 + b0)
@@ -33,41 +37,57 @@ def main() -> int:
         b2 = mask_u64(a2 + b2)
         a3 = mask_u64(a3 + b3)
         b3 = mask_u64(a3 + b3)
-
     for _ in range(remainder):
         a0 = mask_u64(a0 + b0)
         b0 = mask_u64(a0 + b0)
+    return a0 ^ b0 ^ a1 ^ b1 ^ a2 ^ b2 ^ a3 ^ b3
 
-    counter_end = query_thread_cycle_time(context["thread"])
-    cpu_after = get_current_processor_number()
 
-    result = a0 ^ b0 ^ a1 ^ b1 ^ a2 ^ b2 ^ a3 ^ b3
-    cycles = counter_end - counter_start
-    total_adds = iterations * adds_per_iteration
+def _run_eight(loop_trip_count: int, remainder: int) -> int:
+    seeds = extend_seed_pairs(8)
+    values = [value for pair in seeds for value in pair]
+    for _ in range(loop_trip_count):
+        for index in range(0, 16, 2):
+            values[index] = mask_u64(values[index] + values[index + 1])
+            values[index + 1] = mask_u64(values[index] + values[index + 1])
+    for _ in range(remainder):
+        values[0] = mask_u64(values[0] + values[1])
+        values[1] = mask_u64(values[0] + values[1])
+    checksum = 0
+    for value in values:
+        checksum ^= value
+    return checksum
 
-    emit_record(
-        {
-            "implementation": "python_optimized",
-            "pid": context["pid"],
-            "tid": context["tid"],
-            "iterations": iterations,
-            "parallel_chains": parallel_chains,
-            "loop_trip_count": loop_trip_count,
-            "remainder": remainder,
-            "requested_affinity_mask": context["requested_affinity_mask"],
-            "previous_affinity_mask": context["previous_affinity_mask"],
-            "priority_set": context["priority_set"],
-            "thread_priority": context["thread_priority"],
-            "cpu_before": cpu_before,
-            "cpu_after": cpu_after,
-            "timer_kind": "query_thread_cycle_time",
-            "counter_start": counter_start,
-            "counter_end": counter_end,
-            "result": result,
-            "cycles": cycles,
-            "cycles/iteration": cycles / iterations,
-            "cycles/add": cycles / total_adds,
-        }
+
+def main() -> int:
+    case = load_case_from_argv()
+    iterations = int(case["iterations"])
+    parallel_chains = int(case["parallel_chains"])
+    loop_trip_count = iterations // parallel_chains
+    remainder = iterations % parallel_chains
+
+    context = prepare_process_context(str(case["priority_mode"]), str(case["affinity_mode"]))
+
+    start = monotonic_ns()
+    if parallel_chains == 4:
+        checksum = _run_four(loop_trip_count, remainder)
+    elif parallel_chains == 8:
+        checksum = _run_eight(loop_trip_count, remainder)
+    else:
+        checksum = _run_generic(loop_trip_count, remainder, parallel_chains)
+    end = monotonic_ns()
+
+    emit_result_json(
+        build_result(
+            implementation="python_optimized",
+            case=case,
+            context=context,
+            elapsed_ns=end - start,
+            loop_trip_count=loop_trip_count,
+            remainder=remainder,
+            result_checksum=checksum,
+            timer_kind="perf_counter_ns",
+        )
     )
     return 0
 

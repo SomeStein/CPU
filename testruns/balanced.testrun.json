@@ -1,0 +1,48 @@
+{
+  "defaults": {
+    "affinity_mode": "single_core",
+    "priority_mode": "high",
+    "repeats": 3,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "balanced",
+  "implementations": [
+    "c_native",
+    "python_sloppy",
+    "python_optimized",
+    "node_sloppy",
+    "node_optimized",
+    "java_sloppy",
+    "java_optimized"
+  ],
+  "matrix": [
+    {
+      "case_id": "single_chain",
+      "iterations": 80000,
+      "parallel_chains": 1
+    },
+    {
+      "case_id": "four_chains",
+      "iterations": 240000,
+      "parallel_chains": 4
+    },
+    {
+      "case_id": "eight_chains",
+      "iterations": 480000,
+      "parallel_chains": 8,
+      "overrides": {
+        "python_sloppy": {
+          "iterations": 120000
+        },
+        "node_sloppy": {
+          "iterations": 120000
+        },
+        "java_sloppy": {
+          "iterations": 120000
+        }
+      }
+    }
+  ],
+  "name": "Balanced"
+}

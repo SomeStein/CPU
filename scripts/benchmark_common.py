@@ -1,130 +1,196 @@
+from __future__ import annotations
+
 import ctypes
+import json
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
-THREAD_PRIORITY_HIGHEST = 2
-DEFAULT_AFFINITY_MASK = 1 << 0
+from benchkit.common import HOST_ARCH, HOST_OS, implementation_metadata, read_key_value_file
+
 MASK64 = (1 << 64) - 1
-ROOT_DIR = Path(__file__).resolve().parent.parent
-RUNS_DIR = ROOT_DIR / "runs"
-FIELD_ORDER = [
-    "implementation",
-    "pid",
-    "tid",
-    "iterations",
-    "parallel_chains",
-    "loop_trip_count",
-    "remainder",
-    "requested_affinity_mask",
-    "previous_affinity_mask",
-    "priority_set",
-    "thread_priority",
-    "cpu_before",
-    "cpu_after",
-    "timer_kind",
-    "counter_start",
-    "counter_end",
-    "result",
-    "cycles",
-    "cycles/iteration",
-    "cycles/add",
+SEED_PAIRS = [
+    (1, 1),
+    (3, 5),
+    (8, 13),
+    (21, 34),
+    (55, 89),
+    (144, 233),
+    (377, 610),
+    (987, 1597),
 ]
-CSV_FIELD_ORDER = [
-    "batch_name",
-    "run_number",
-    "timestamp",
-    "log_file",
-    "exit_code",
-    *FIELD_ORDER,
-]
-HEX_FIELDS = {"requested_affinity_mask", "previous_affinity_mask"}
-FLOAT_FIELDS = {"cycles/iteration", "cycles/add"}
-
-DWORD = ctypes.c_uint32
-BOOL = ctypes.c_int
-HANDLE = ctypes.c_void_p
-DWORD_PTR = ctypes.c_size_t
-ULONG64 = ctypes.c_ulonglong
-
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-kernel32.GetCurrentThread.restype = HANDLE
-kernel32.GetCurrentProcessId.restype = DWORD
-kernel32.GetCurrentThreadId.restype = DWORD
-kernel32.SetThreadAffinityMask.argtypes = [HANDLE, DWORD_PTR]
-kernel32.SetThreadAffinityMask.restype = DWORD_PTR
-kernel32.SetThreadPriority.argtypes = [HANDLE, ctypes.c_int]
-kernel32.SetThreadPriority.restype = BOOL
-kernel32.GetThreadPriority.argtypes = [HANDLE]
-kernel32.GetThreadPriority.restype = ctypes.c_int
-kernel32.GetCurrentProcessorNumber.restype = DWORD
-kernel32.QueryThreadCycleTime.argtypes = [HANDLE, ctypes.POINTER(ULONG64)]
-kernel32.QueryThreadCycleTime.restype = BOOL
-
-
-def get_positive_int_from_env(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None or raw == "":
-        return default
-    try:
-        parsed = int(raw, 10)
-    except ValueError:
-        return default
-    if parsed <= 0:
-        return default
-    return parsed
-
-
-def prepare_thread_context(requested_mask: int = DEFAULT_AFFINITY_MASK) -> dict:
-    thread = kernel32.GetCurrentThread()
-    previous_mask = kernel32.SetThreadAffinityMask(thread, requested_mask)
-    priority_ok = kernel32.SetThreadPriority(thread, THREAD_PRIORITY_HIGHEST)
-    return {
-        "thread": thread,
-        "pid": int(kernel32.GetCurrentProcessId()),
-        "tid": int(kernel32.GetCurrentThreadId()),
-        "requested_affinity_mask": int(requested_mask),
-        "previous_affinity_mask": int(previous_mask),
-        "priority_set": 1 if priority_ok else 0,
-        "thread_priority": int(kernel32.GetThreadPriority(thread)),
-    }
-
-
-def get_current_processor_number() -> int:
-    return int(kernel32.GetCurrentProcessorNumber())
-
-
-def query_thread_cycle_time(thread: HANDLE) -> int:
-    value = ULONG64()
-    ok = kernel32.QueryThreadCycleTime(thread, ctypes.byref(value))
-    if not ok:
-        raise ctypes.WinError(ctypes.get_last_error())
-    return int(value.value)
 
 
 def mask_u64(value: int) -> int:
     return value & MASK64
 
 
-def stringify_field(key: str, value) -> str:
-    if key in HEX_FIELDS:
-        return f"0x{int(value):x}"
-    if key in FLOAT_FIELDS:
-        return f"{float(value):.6f}"
-    return str(value)
+def monotonic_ns() -> int:
+    return time.perf_counter_ns()
 
 
-def emit_record(record: dict) -> None:
-    for key in FIELD_ORDER:
-        sys.stdout.write(f"{key} = {stringify_field(key, record[key])}\n")
+def extend_seed_pairs(count: int) -> list[tuple[int, int]]:
+    pairs = list(SEED_PAIRS)
+    while len(pairs) < count:
+        left = mask_u64(pairs[-2][0] + pairs[-1][1])
+        right = mask_u64(left + pairs[-1][0])
+        pairs.append((left, right))
+    return pairs[:count]
+
+
+def load_case_file(path: Path) -> dict[str, object]:
+    raw = read_key_value_file(path)
+    return {
+        "run_id": raw["run_id"],
+        "profile_id": raw["profile_id"],
+        "implementation": raw["implementation"],
+        "case_id": raw["case_id"],
+        "iterations": int(raw["iterations"], 10),
+        "parallel_chains": int(raw["parallel_chains"], 10),
+        "priority_mode": raw["priority_mode"],
+        "affinity_mode": raw["affinity_mode"],
+        "timer_mode": raw["timer_mode"],
+        "warmup": raw["warmup"] == "true",
+        "repeat_index": int(raw["repeat_index"], 10),
+    }
+
+
+def load_case_from_argv() -> dict[str, object]:
+    if len(sys.argv) != 3 or sys.argv[1] != "--case-file":
+        raise SystemExit("Usage: <script> --case-file <path>")
+    return load_case_file(Path(sys.argv[2]))
+
+
+if sys.platform == "win32":
+    DWORD = ctypes.c_uint32
+    BOOL = ctypes.c_int
+    HANDLE = ctypes.c_void_p
+    DWORD_PTR = ctypes.c_size_t
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetCurrentProcessId.restype = DWORD
+    kernel32.GetCurrentThreadId.restype = DWORD
+    kernel32.GetCurrentThread.restype = HANDLE
+    kernel32.SetThreadPriority.argtypes = [HANDLE, ctypes.c_int]
+    kernel32.SetThreadPriority.restype = BOOL
+    kernel32.SetThreadAffinityMask.argtypes = [HANDLE, DWORD_PTR]
+    kernel32.SetThreadAffinityMask.restype = DWORD_PTR
+
+
+def _windows_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
+    thread = kernel32.GetCurrentThread()
+    applied_priority = "unchanged"
+    applied_affinity = "unchanged"
+    notes: list[str] = []
+
+    if priority_mode == "high":
+        if kernel32.SetThreadPriority(thread, 2):
+            applied_priority = "high"
+        else:
+            applied_priority = "failed"
+            notes.append("SetThreadPriority failed")
+
+    if affinity_mode == "single_core":
+        previous = kernel32.SetThreadAffinityMask(thread, 1)
+        if previous:
+            applied_affinity = "single_core"
+        else:
+            applied_affinity = "failed"
+            notes.append("SetThreadAffinityMask failed")
+
+    return {
+        "pid": int(kernel32.GetCurrentProcessId()),
+        "tid": int(kernel32.GetCurrentThreadId()),
+        "requested_priority_mode": priority_mode,
+        "requested_affinity_mode": affinity_mode,
+        "applied_priority_mode": applied_priority,
+        "applied_affinity_mode": applied_affinity,
+        "scheduler_notes": "; ".join(notes),
+    }
+
+
+def _posix_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
+    applied_priority = "unchanged"
+    notes: list[str] = []
+
+    if priority_mode == "high":
+        try:
+            os.nice(-5)
+            applied_priority = "high"
+        except (AttributeError, PermissionError, OSError):
+            applied_priority = "unsupported"
+            notes.append("priority elevation unavailable")
+
+    applied_affinity = "unsupported" if affinity_mode == "single_core" else "unchanged"
+    if affinity_mode == "single_core":
+        notes.append("affinity control unavailable")
+
+    return {
+        "pid": os.getpid(),
+        "tid": threading.get_native_id(),
+        "requested_priority_mode": priority_mode,
+        "requested_affinity_mode": affinity_mode,
+        "applied_priority_mode": applied_priority,
+        "applied_affinity_mode": applied_affinity,
+        "scheduler_notes": "; ".join(notes),
+    }
+
+
+def prepare_process_context(priority_mode: str, affinity_mode: str) -> dict[str, object]:
+    if sys.platform == "win32":
+        return _windows_context(priority_mode, affinity_mode)
+    return _posix_context(priority_mode, affinity_mode)
+
+
+def build_result(
+    *,
+    implementation: str,
+    case: dict[str, object],
+    context: dict[str, object],
+    elapsed_ns: int,
+    loop_trip_count: int,
+    remainder: int,
+    result_checksum: int,
+    timer_kind: str,
+    platform_extras: dict[str, object] | None = None,
+) -> dict[str, object]:
+    iterations = int(case["iterations"])
+    total_adds = iterations * 2 if iterations else 0
+    metadata = implementation_metadata(implementation)
+    return {
+        "schema_version": 1,
+        "implementation": implementation,
+        "language": metadata["language"],
+        "variant": metadata["variant"],
+        "case_id": case["case_id"],
+        "warmup": bool(case["warmup"]),
+        "repeat_index": int(case["repeat_index"]),
+        "iterations": iterations,
+        "parallel_chains": int(case["parallel_chains"]),
+        "loop_trip_count": loop_trip_count,
+        "remainder": remainder,
+        "timer_kind": timer_kind,
+        "elapsed_ns": elapsed_ns,
+        "ns_per_iteration": (elapsed_ns / iterations) if iterations else 0.0,
+        "ns_per_add": (elapsed_ns / total_adds) if total_adds else 0.0,
+        "result_checksum": str(mask_u64(result_checksum)),
+        "host_os": HOST_OS,
+        "host_arch": HOST_ARCH,
+        "pid": context["pid"],
+        "tid": context["tid"],
+        "requested_priority_mode": context["requested_priority_mode"],
+        "requested_affinity_mode": context["requested_affinity_mode"],
+        "applied_priority_mode": context["applied_priority_mode"],
+        "applied_affinity_mode": context["applied_affinity_mode"],
+        "scheduler_notes": context["scheduler_notes"],
+        "runtime_name": Path(sys.executable).name,
+        "platform_extras": platform_extras or {},
+    }
+
+
+def emit_result_json(payload: dict[str, object]) -> None:
+    sys.stdout.write(json.dumps(payload, sort_keys=True))
+    sys.stdout.write("\n")
     sys.stdout.flush()
-
-
-def parse_key_value_text(text: str) -> dict:
-    parsed = {}
-    for line in text.splitlines():
-        if " = " not in line:
-            continue
-        key, value = line.split(" = ", 1)
-        parsed[key.strip()] = value.strip()
-    return parsed

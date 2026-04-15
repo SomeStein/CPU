@@ -1,0 +1,51 @@
+{
+  "host_arch": "arm64",
+  "host_os": "macos",
+  "profile": {
+    "defaults": {
+      "affinity_mode": "single_core",
+      "priority_mode": "high",
+      "repeats": 5,
+      "timer_mode": "monotonic_ns",
+      "warmups": 2
+    },
+    "id": "stress",
+    "implementations": [
+      "c_native",
+      "python_sloppy",
+      "python_optimized",
+      "node_sloppy",
+      "node_optimized",
+      "java_sloppy",
+      "java_optimized"
+    ],
+    "matrix": [
+      {
+        "case_id": "stress_four",
+        "iterations": 750000,
+        "parallel_chains": 4
+      },
+      {
+        "case_id": "stress_eight",
+        "iterations": 1500000,
+        "overrides": {
+          "java_sloppy": {
+            "iterations": 300000
+          },
+          "node_sloppy": {
+            "iterations": 300000
+          },
+          "python_sloppy": {
+            "iterations": 300000
+          }
+        },
+        "parallel_chains": 8
+      }
+    ],
+    "name": "Stress"
+  },
+  "run_id": "run01_19_30_15_04_26",
+  "run_number": 1,
+  "schema_version": 1,
+  "started_at": "2026-04-15T19:30:34"
+}

@@ -1,0 +1,7 @@
+[command]
+/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/scripts/python_optimized.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run02_19_33_15_04_26/cases/python_optimized__quick_parallel__warmup_1.case
+
+[stdout]
+{"applied_affinity_mode": "unsupported", "applied_priority_mode": "unsupported", "case_id": "quick_parallel", "elapsed_ns": 14160916, "host_arch": "arm64", "host_os": "macos", "implementation": "python_optimized", "iterations": 40000, "language": "python", "loop_trip_count": 10000, "ns_per_add": 177.01145, "ns_per_iteration": 354.0229, "parallel_chains": 4, "pid": 93816, "platform_extras": {}, "remainder": 0, "repeat_index": 1, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "9095820053878083041", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; affinity control unavailable", "schema_version": 1, "tid": 20649271, "timer_kind": "perf_counter_ns", "variant": "optimized", "warmup": true}
+
+[stderr]

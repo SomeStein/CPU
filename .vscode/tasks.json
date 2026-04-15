@@ -3,8 +3,11 @@
   "tasks": [
     {
       "label": "Build Benchmarks",
-      "type": "shell",
-      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "type": "process",
+      "command": "${workspaceFolder}/scripts/run-task.sh",
+      "windows": {
+        "command": "${workspaceFolder}\\scripts\\run-task.cmd"
+      },
       "args": [
         "build"
       ],
@@ -19,10 +22,15 @@
     },
     {
       "label": "Run All Benchmarks",
-      "type": "shell",
-      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "type": "process",
+      "command": "${workspaceFolder}/scripts/run-task.sh",
+      "windows": {
+        "command": "${workspaceFolder}\\scripts\\run-task.cmd"
+      },
       "args": [
-        "run"
+        "run",
+        "--profile",
+        "balanced"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -35,14 +43,21 @@
     },
     {
       "label": "Analyze Runs",
-      "type": "shell",
-      "command": "C:\\msys64\\mingw64\\bin\\mingw32-make.exe",
+      "type": "process",
+      "command": "${workspaceFolder}/scripts/run-task.sh",
+      "windows": {
+        "command": "${workspaceFolder}\\scripts\\run-task.cmd"
+      },
       "args": [
         "analyze"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
+      "dependsOn": [
+        "Build Benchmarks"
+      ],
+      "dependsOrder": "sequence",
       "problemMatcher": []
     }
   ]
