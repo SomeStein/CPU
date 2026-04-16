@@ -1,7 +1,0 @@
-[command]
-/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run03_01_32_16_04_26/cases/python__eight_chains__warmup_1.case
-
-[stdout]
-{"applied_affinity_mode": "advisory_macos", "applied_priority_mode": "advisory_macos", "case_id": "eight_chains", "elapsed_ns": 142481541, "host_arch": "arm64", "host_os": "macos", "implementation": "python", "iterations": 480000, "language": "python", "loop_trip_count": 60000, "ns_per_add": 148.418271875, "ns_per_iteration": 296.83654375, "parallel_chains": 8, "pid": 9107, "platform_extras": {}, "remainder": 0, "repeat_index": 1, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "6231199587631017438", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; macos: affinity advisory (apple silicon does not honor pinning); QoS set to user_interactive", "schema_version": 1, "tid": 21052600, "timer_kind": "perf_counter_ns", "variant": "default", "warmup": true}
-
-[stderr]

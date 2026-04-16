@@ -1,0 +1,11 @@
+run_id=run03_02_35_16_04_26
+profile_id=iterations_p8
+implementation=java
+case_id=case5
+iterations=10000
+parallel_chains=8
+priority_mode=high
+affinity_mode=single_core
+timer_mode=monotonic_ns
+warmup=false
+repeat_index=7

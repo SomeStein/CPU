@@ -1,0 +1,2 @@
+[command-error]
+Missing native benchmark binary for rust. Expected tools/bin/macos-arm64/rust.

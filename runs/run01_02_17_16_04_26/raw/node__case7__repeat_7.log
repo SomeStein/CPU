@@ -1,0 +1,7 @@
+[command]
+/usr/local/bin/node /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/node/node.mjs --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run01_02_17_16_04_26/cases/node__case7__repeat_7.case
+
+[stdout]
+{"schema_version":1,"implementation":"node","language":"node","variant":"default","case_id":"case7","warmup":false,"repeat_index":7,"iterations":1000000,"parallel_chains":1,"loop_trip_count":1000000,"remainder":0,"timer_kind":"hrtime_ns","elapsed_ns":94667166,"ns_per_iteration":94.667166,"ns_per_add":47.333583,"result_checksum":"3327103073201887045","host_os":"macos","host_arch":"arm64","pid":19641,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"advisory_macos","applied_affinity_mode":"advisory_macos","scheduler_notes":"Node runtime uses controller-side best effort only; macOS affinity remains advisory","runtime_name":"node","platform_extras":{}}
+
+[stderr]
