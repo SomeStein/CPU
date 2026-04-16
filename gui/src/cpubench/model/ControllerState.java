@@ -1,6 +1,7 @@
 package cpubench.model;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,8 +13,13 @@ public final class ControllerState {
     private TableData runResults = TableData.empty();
     private TableData runEvents = TableData.empty();
     private TableData runManifest = TableData.empty();
+    private TableData liveRuns = TableData.empty();
+    private TableData liveGlobalResults = TableData.empty();
+    private TableData liveRunResults = TableData.empty();
+    private TableData liveRunEvents = TableData.empty();
     private String currentRunId = "";
     private String currentProfileId = "";
+    private String liveRunId = "";
     private FilterState runFilter = FilterState.defaults();
     private FilterState globalFilter = FilterState.defaults();
 
@@ -73,6 +79,38 @@ public final class ControllerState {
         this.runManifest = runManifest;
     }
 
+    public TableData liveRuns() {
+        return liveRuns;
+    }
+
+    public void setLiveRuns(TableData liveRuns) {
+        this.liveRuns = liveRuns;
+    }
+
+    public TableData liveGlobalResults() {
+        return liveGlobalResults;
+    }
+
+    public void setLiveGlobalResults(TableData liveGlobalResults) {
+        this.liveGlobalResults = liveGlobalResults;
+    }
+
+    public TableData liveRunResults() {
+        return liveRunResults;
+    }
+
+    public void setLiveRunResults(TableData liveRunResults) {
+        this.liveRunResults = liveRunResults;
+    }
+
+    public TableData liveRunEvents() {
+        return liveRunEvents;
+    }
+
+    public void setLiveRunEvents(TableData liveRunEvents) {
+        this.liveRunEvents = liveRunEvents;
+    }
+
     public String currentRunId() {
         return currentRunId;
     }
@@ -87,6 +125,14 @@ public final class ControllerState {
 
     public void setCurrentProfileId(String currentProfileId) {
         this.currentProfileId = currentProfileId;
+    }
+
+    public String liveRunId() {
+        return liveRunId;
+    }
+
+    public void setLiveRunId(String liveRunId) {
+        this.liveRunId = liveRunId;
     }
 
     public FilterState runFilter() {
@@ -105,12 +151,42 @@ public final class ControllerState {
         this.globalFilter = globalFilter;
     }
 
+    public TableData displayedRuns() {
+        return merge(runs, liveRuns, List.of("run_id"));
+    }
+
+    public TableData displayedGlobalResults() {
+        return merge(globalResults, liveGlobalResults, List.of("run_id", "implementation", "case_id", "warmup", "repeat_index"));
+    }
+
+    public TableData displayedRunResults() {
+        if (!liveRunId.isBlank() && liveRunId.equals(currentRunId)) {
+            return merge(runResults, liveRunResults, List.of("run_id", "implementation", "case_id", "warmup", "repeat_index"));
+        }
+        return runResults;
+    }
+
+    public TableData displayedRunEvents() {
+        if (!liveRunId.isBlank() && liveRunId.equals(currentRunId)) {
+            return merge(runEvents, liveRunEvents, List.of("phase", "step_index", "implementation", "case_id", "repeat_index"));
+        }
+        return runEvents;
+    }
+
     public TableData filteredRunResults() {
-        return filter(runResults, runFilter);
+        return filter(displayedRunResults(), runFilter);
     }
 
     public TableData filteredGlobalResults() {
-        return filter(globalResults, globalFilter);
+        return filter(displayedGlobalResults(), globalFilter);
+    }
+
+    public void clearLiveRun() {
+        liveRunId = "";
+        liveRuns = TableData.empty();
+        liveGlobalResults = TableData.empty();
+        liveRunResults = TableData.empty();
+        liveRunEvents = TableData.empty();
     }
 
     private static TableData filter(TableData source, FilterState filter) {
@@ -136,5 +212,31 @@ public final class ControllerState {
             values.add(line);
         }
         return new TableData(preferredHeaders, values);
+    }
+
+    private static TableData merge(TableData base, TableData overlay, List<String> keyColumns) {
+        if (base.headers().isEmpty()) {
+            return overlay;
+        }
+        if (overlay.headers().isEmpty()) {
+            return base;
+        }
+        List<String> headers = base.headers().equals(overlay.headers()) ? base.headers() : base.headers();
+        Map<String, Map<String, String>> merged = new LinkedHashMap<>();
+        for (Map<String, String> row : base.asMaps()) {
+            merged.put(key(row, keyColumns), row);
+        }
+        for (Map<String, String> row : overlay.asMaps()) {
+            merged.put(key(row, keyColumns), row);
+        }
+        return mapsToTableData(new ArrayList<>(merged.values()), headers);
+    }
+
+    private static String key(Map<String, String> row, List<String> keyColumns) {
+        StringBuilder builder = new StringBuilder();
+        for (String key : keyColumns) {
+            builder.append(row.getOrDefault(key, "")).append('\u001f');
+        }
+        return builder.toString();
     }
 }

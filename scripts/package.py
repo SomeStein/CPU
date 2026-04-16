@@ -5,7 +5,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from benchkit.build import build_compiled_benchmarks, build_java
+from benchkit.build import build_compiled_entry, build_java
+from benchkit.catalog import IMPLEMENTATIONS
 from benchkit.common import BUILD_DIR, HOST_KEY, HOST_OS, ROOT_DIR, TOOLS_DIR, ensure_supported_host
 from benchkit.runtimes import resolve_tool
 
@@ -54,7 +55,19 @@ def ensure_runtimes() -> None:
 
 
 def compile_natives() -> None:
-    build_compiled_benchmarks()
+    failures: list[str] = []
+    for entry in IMPLEMENTATIONS.values():
+        if entry.compiler_kind is None:
+            continue
+        try:
+            build_compiled_entry(entry, required=True)
+        except (FileNotFoundError, subprocess.CalledProcessError) as error:
+            failures.append(f"{entry.implementation_id}: {error}")
+    if failures:
+        raise RuntimeError(
+            "Unable to build packaged native benchmarks:\n"
+            + "\n".join(f"- {failure}" for failure in failures)
+        )
 
 
 def compile_java() -> Path:

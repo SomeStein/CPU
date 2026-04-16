@@ -1,7 +1,0 @@
-[command]
-/usr/bin/ruby /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/ruby/ruby.rb --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run03_02_35_16_04_26/cases/ruby__case8__repeat_1.case
-
-[stdout]
-{"schema_version":1,"implementation":"ruby","language":"ruby","variant":"default","case_id":"case8","warmup":false,"repeat_index":1,"iterations":10000000,"parallel_chains":4,"loop_trip_count":2500000,"remainder":0,"timer_kind":"clock_gettime_ns","elapsed_ns":2884650000,"ns_per_iteration":288.465,"ns_per_add":144.2325,"result_checksum":"2114941700197524897","host_os":"macos","host_arch":"arm64","pid":24191,"tid":0,"requested_priority_mode":"high","requested_affinity_mode":"single_core","applied_priority_mode":"advisory_macos","applied_affinity_mode":"advisory_macos","scheduler_notes":"Ruby runtime uses controller-side best effort scheduling only; macOS affinity remains advisory","runtime_name":"ruby","platform_extras":{}}
-
-[stderr]

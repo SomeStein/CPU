@@ -19,7 +19,8 @@ public final class LanguageCellRenderer extends DefaultTableCellRenderer {
         super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         String implementationId = String.valueOf(value);
         setIcon(LanguageIconRegistry.icon(implementationId, 16));
-        setText(" " + LanguageIconRegistry.displayName(implementationId));
+        setText("");
+        setHorizontalAlignment(CENTER);
         setToolTipText(LanguageIconRegistry.displayName(implementationId));
         if (!isSelected) {
             setBackground(row % 2 == 0 ? UiPalette.SURFACE : UiPalette.SURFACE_ALT);

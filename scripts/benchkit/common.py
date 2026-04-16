@@ -29,6 +29,9 @@ CUSTOM_TESTRUNS_DIR = TESTRUNS_DIR / "custom"
 BUILD_DIR = ROOT_DIR / "build"
 TOOLS_DIR = ROOT_DIR / "tools"
 TOOLS_BIN_DIR = TOOLS_DIR / "bin"
+BUILD_TMP_DIR = BUILD_DIR / "tmp"
+
+ARTIFACT_URI_PREFIX = "artifact://"
 
 RUN_DIR_PATTERN = re.compile(r"^run(?P<number>\d+)_(?P<stamp>\d{2}_\d{2}_\d{2}_\d{2}_\d{2})$")
 
@@ -122,9 +125,14 @@ def next_run_number() -> int:
     if not RUNS_DIR.exists():
         return 1
     for entry in RUNS_DIR.iterdir():
-        if not entry.is_dir():
+        candidate_name = ""
+        if entry.is_dir():
+            candidate_name = entry.name
+        elif entry.is_file() and entry.suffix == ".json":
+            candidate_name = entry.stem
+        if not candidate_name:
             continue
-        match = RUN_DIR_PATTERN.match(entry.name)
+        match = RUN_DIR_PATTERN.match(candidate_name)
         if match:
             highest = max(highest, int(match.group("number")))
     return highest + 1
@@ -132,6 +140,28 @@ def next_run_number() -> int:
 
 def build_run_id(run_number: int, timestamp: datetime) -> str:
     return f"run{run_number:02d}_{timestamp:%H_%M_%d_%m_%y}"
+
+
+def run_bundle_path(run_id: str) -> Path:
+    return RUNS_DIR / f"{run_id}.json"
+
+
+def temp_run_dir(run_id: str) -> Path:
+    return BUILD_TMP_DIR / f"run-{run_id}"
+
+
+def artifact_uri(run_id: str, artifact_key: str) -> str:
+    return f"{ARTIFACT_URI_PREFIX}{run_id}/{artifact_key}"
+
+
+def parse_artifact_uri(value: str) -> tuple[str, str] | None:
+    if not value.startswith(ARTIFACT_URI_PREFIX):
+        return None
+    remainder = value[len(ARTIFACT_URI_PREFIX):]
+    run_id, separator, artifact_key = remainder.partition("/")
+    if not separator or not run_id or not artifact_key:
+        return None
+    return run_id, artifact_key
 
 
 def read_json(path: Path) -> dict:

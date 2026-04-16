@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -9,22 +10,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from .catalog import IMPLEMENTATIONS, ImplementationEntry, implementation_entry
+from .catalog import IMPLEMENTATIONS, ImplementationEntry
 from .common import (
     HOST_ARCH,
     HOST_OS,
     RESULT_FIELD_ORDER,
     ROOT_DIR,
     RUNS_DIR,
+    artifact_uri,
     build_run_id,
     implementation_metadata,
     next_run_number,
+    run_bundle_path,
     stringify,
-    write_csv_rows,
+    temp_run_dir,
     write_json,
     write_key_value_file,
 )
-from .history import append_index_rows
+from .history import rebuild_index_rows
 from .profiles import load_profile, load_profile_path, profile_location, profile_rows
 from .runtimes import ResolvedTool, resolve_tool
 
@@ -135,15 +138,19 @@ def run_profile_payload(
     timestamp = datetime.now()
     run_number = next_run_number()
     run_id = build_run_id(run_number, timestamp)
-    run_dir = RUNS_DIR / run_id
-    cases_dir = run_dir / "cases"
-    raw_dir = run_dir / "raw"
-    run_dir.mkdir(parents=True, exist_ok=False)
-    cases_dir.mkdir()
-    raw_dir.mkdir()
+    bundle_path = run_bundle_path(run_id)
+    if bundle_path.exists():
+        raise FileExistsError(f"Run bundle already exists: {bundle_path}")
+    temp_dir = temp_run_dir(run_id)
+    cases_dir = temp_dir / "cases"
+    raw_dir = temp_dir / "raw"
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    cases_dir.mkdir(parents=True, exist_ok=False)
+    raw_dir.mkdir(exist_ok=False)
 
     events: list[dict[str, str]] = []
     results: list[dict[str, str]] = []
+    artifacts: dict[str, dict[str, object]] = {}
     if profile.path.is_absolute():
         try:
             profile_path_text = str(profile.path.relative_to(ROOT_DIR)).replace("\\", "/")
@@ -162,7 +169,6 @@ def run_profile_payload(
         "host_os": HOST_OS,
         "host_arch": HOST_ARCH,
     }
-    write_json(run_dir / "manifest.json", manifest)
 
     defaults = payload["defaults"]
     warmups = int(defaults["warmups"])
@@ -181,75 +187,84 @@ def run_profile_payload(
         step_total=step_total,
         message=f"Starting profile {payload['id']}",
     )
+    try:
+        for implementation_id in payload["implementations"]:
+            entry = IMPLEMENTATIONS[implementation_id]
+            runtime = _resolve_runtime(entry)
+            for case in payload["matrix"]:
+                for warmup_index in range(1, warmups + 1):
+                    case_values = _case_values(payload["id"], implementation_id, case, defaults, warmup_index, True)
+                    case_values["run_id"] = run_id
+                    execution_name = f"{implementation_id}__{case['case_id']}__warmup_{warmup_index}"
+                    _execute_case(
+                        entry=entry,
+                        runtime=runtime,
+                        case_values=case_values,
+                        execution_name=execution_name,
+                        java_output_dir=java_output_dir,
+                        cases_dir=cases_dir,
+                        raw_dir=raw_dir,
+                        manifest=manifest,
+                        results=results,
+                        events=events,
+                        artifacts=artifacts,
+                        stream=stream,
+                        step_index=step_index + 1,
+                        step_total=step_total,
+                    )
+                    step_index += 1
+                for repeat_index in range(1, repeats + 1):
+                    case_values = _case_values(payload["id"], implementation_id, case, defaults, repeat_index, False)
+                    case_values["run_id"] = run_id
+                    execution_name = f"{implementation_id}__{case['case_id']}__repeat_{repeat_index}"
+                    _execute_case(
+                        entry=entry,
+                        runtime=runtime,
+                        case_values=case_values,
+                        execution_name=execution_name,
+                        java_output_dir=java_output_dir,
+                        cases_dir=cases_dir,
+                        raw_dir=raw_dir,
+                        manifest=manifest,
+                        results=results,
+                        events=events,
+                        artifacts=artifacts,
+                        stream=stream,
+                        step_index=step_index + 1,
+                        step_total=step_total,
+                    )
+                    step_index += 1
 
-    for implementation_id in payload["implementations"]:
-        entry = IMPLEMENTATIONS[implementation_id]
-        runtime = _resolve_runtime(entry)
-        for case in payload["matrix"]:
-            for warmup_index in range(1, warmups + 1):
-                case_values = _case_values(payload["id"], implementation_id, case, defaults, warmup_index, True)
-                case_values["run_id"] = run_id
-                execution_name = f"{implementation_id}__{case['case_id']}__warmup_{warmup_index}"
-                _execute_case(
-                    entry=entry,
-                    runtime=runtime,
-                    case_values=case_values,
-                    execution_name=execution_name,
-                    java_output_dir=java_output_dir,
-                    run_dir=run_dir,
-                    cases_dir=cases_dir,
-                    raw_dir=raw_dir,
-                    manifest=manifest,
-                    results=results,
-                    events=events,
-                    stream=stream,
-                    step_index=step_index + 1,
-                    step_total=step_total,
-                )
-                step_index += 1
-            for repeat_index in range(1, repeats + 1):
-                case_values = _case_values(payload["id"], implementation_id, case, defaults, repeat_index, False)
-                case_values["run_id"] = run_id
-                execution_name = f"{implementation_id}__{case['case_id']}__repeat_{repeat_index}"
-                _execute_case(
-                    entry=entry,
-                    runtime=runtime,
-                    case_values=case_values,
-                    execution_name=execution_name,
-                    java_output_dir=java_output_dir,
-                    run_dir=run_dir,
-                    cases_dir=cases_dir,
-                    raw_dir=raw_dir,
-                    manifest=manifest,
-                    results=results,
-                    events=events,
-                    stream=stream,
-                    step_index=step_index + 1,
-                    step_total=step_total,
-                )
-                step_index += 1
+        status = "success"
+        if any(row.get("status") != "success" for row in results):
+            status = "partial_failure"
 
-    write_csv_rows(run_dir / "results.csv", RESULT_FIELD_ORDER, results)
-    append_index_rows(results)
-    events_path = run_dir / "events.ndjson"
-    status = "success"
-    if any(row.get("status") != "success" for row in results):
-        status = "partial_failure"
-
-    _event(
-        stream,
-        events,
-        event_type="run",
-        phase="completed",
-        run_id=run_id,
-        profile_id=payload["id"],
-        status=status,
-        step_index=step_total,
-        step_total=step_total,
-        message=f"Completed profile {payload['id']}",
-    )
-    events_path.write_text("".join(json.dumps(event, sort_keys=True) + "\n" for event in events), encoding="utf-8")
-    return {"run_id": run_id, "status": status}
+        _event(
+            None,
+            events,
+            event_type="run",
+            phase="completed",
+            run_id=run_id,
+            profile_id=payload["id"],
+            status=status,
+            step_index=step_total,
+            step_total=step_total,
+            message=f"Completed profile {payload['id']}",
+        )
+        bundle = {
+            "schema_version": 1,
+            "manifest": manifest,
+            "results": [{field: stringify(row.get(field, "")) for field in RESULT_FIELD_ORDER} for row in results],
+            "events": events,
+            "artifacts": artifacts,
+        }
+        write_json(bundle_path, bundle)
+        rebuild_index_rows()
+        if stream is not None:
+            stream(events[-1])
+        return {"run_id": run_id, "status": status}
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:
@@ -370,12 +385,12 @@ def _execute_case(
     case_values: dict[str, object],
     execution_name: str,
     java_output_dir: Path,
-    run_dir: Path,
     cases_dir: Path,
     raw_dir: Path,
     manifest: dict,
     results: list[dict[str, str]],
     events: list[dict[str, str]],
+    artifacts: dict[str, dict[str, object]],
     stream: EventCallback | None,
     step_index: int,
     step_total: int,
@@ -384,6 +399,8 @@ def _execute_case(
     write_key_value_file(case_file, case_values)
 
     raw_log_path = raw_dir / f"{execution_name}.log"
+    raw_log_ref = str(raw_log_path.relative_to(ROOT_DIR)).replace("\\", "/")
+    artifact_ref = artifact_uri(manifest["run_id"], execution_name)
     base_row = {
         "run_id": manifest["run_id"],
         "run_number": manifest["run_number"],
@@ -403,8 +420,8 @@ def _execute_case(
         "runtime_name": runtime.name,
         "runtime_source": runtime.source,
         "status": "failed",
-        "log_file": str(raw_log_path.relative_to(ROOT_DIR)).replace("\\", "/"),
-        "raw_file": str(raw_log_path.relative_to(ROOT_DIR)).replace("\\", "/"),
+        "log_file": artifact_ref,
+        "raw_file": artifact_ref,
         "error_message": "",
     }
     base_row.update(implementation_metadata(entry.implementation_id))
@@ -412,16 +429,21 @@ def _execute_case(
     try:
         command = _command_for_entry(entry, runtime, case_file, java_output_dir)
     except Exception as error:
-        raw_log_path.write_text(f"[command-error]\n{error}\n", encoding="utf-8")
+        raw_log_text = f"[command-error]\n{error}\n"
+        raw_log_path.write_text(raw_log_text, encoding="utf-8")
         row = dict(base_row)
         row["error_message"] = str(error)
         _append_result_and_event(
             row=row,
+            live_row=_with_temp_artifact_paths(row, raw_log_ref),
             entry=entry,
             execution_name=execution_name,
             manifest=manifest,
             results=results,
             events=events,
+            artifacts=artifacts,
+            case_values=case_values,
+            raw_log_text=raw_log_text,
             stream=stream,
             step_index=step_index,
             step_total=step_total,
@@ -452,16 +474,21 @@ def _execute_case(
         raw_log_text = f"[command]\n{' '.join(command)}\n\n[stdout]\n{stdout}\n[stderr]\n{stderr}"
         raw_log_path.write_text(raw_log_text, encoding="utf-8")
     except Exception as error:
-        raw_log_path.write_text(f"[command]\n{' '.join(command)}\n\n[start-error]\n{error}\n", encoding="utf-8")
+        raw_log_text = f"[command]\n{' '.join(command)}\n\n[start-error]\n{error}\n"
+        raw_log_path.write_text(raw_log_text, encoding="utf-8")
         row = dict(base_row)
         row["error_message"] = str(error)
         _append_result_and_event(
             row=row,
+            live_row=_with_temp_artifact_paths(row, raw_log_ref),
             entry=entry,
             execution_name=execution_name,
             manifest=manifest,
             results=results,
             events=events,
+            artifacts=artifacts,
+            case_values=case_values,
+            raw_log_text=raw_log_text,
             stream=stream,
             step_index=step_index,
             step_total=step_total,
@@ -497,11 +524,15 @@ def _execute_case(
 
     _append_result_and_event(
         row=row,
+        live_row=_with_temp_artifact_paths(row, raw_log_ref),
         entry=entry,
         execution_name=execution_name,
         manifest=manifest,
         results=results,
         events=events,
+        artifacts=artifacts,
+        case_values=case_values,
+        raw_log_text=raw_log_text,
         stream=stream,
         step_index=step_index,
         step_total=step_total,
@@ -511,33 +542,49 @@ def _execute_case(
 def _append_result_and_event(
     *,
     row: dict[str, str],
+    live_row: dict[str, str],
     entry: ImplementationEntry,
     execution_name: str,
     manifest: dict,
     results: list[dict[str, str]],
     events: list[dict[str, str]],
+    artifacts: dict[str, dict[str, object]],
+    case_values: dict[str, object],
+    raw_log_text: str,
     stream: EventCallback | None,
     step_index: int,
     step_total: int,
 ) -> None:
     results.append({field: stringify(row.get(field, "")) for field in RESULT_FIELD_ORDER})
-    _event(
-        stream,
-        events,
-        event_type="case",
-        phase="finished",
-        run_id=manifest["run_id"],
-        profile_id=manifest["profile"]["id"],
-        implementation=entry.implementation_id,
-        case_id=row.get("case_id", ""),
-        repeat_index=row.get("repeat_index", ""),
-        warmup=row.get("warmup", ""),
-        status=row["status"],
-        metric=row.get("ns_per_iteration") or row.get("legacy_cycles_per_iteration", ""),
-        metric_kind="ns/iter" if row.get("ns_per_iteration") else ("cycles/iter" if row.get("legacy_cycles_per_iteration") else ""),
-        elapsed_ns=row.get("elapsed_ns", ""),
-        timer_kind=row.get("timer_kind", ""),
-        step_index=step_index,
-        step_total=step_total,
-        message=f"Finished {execution_name}",
-    )
+    artifacts[execution_name] = {
+        "case_values": {key: stringify(value) for key, value in case_values.items()},
+        "raw_log": raw_log_text,
+    }
+    event_payload = {
+        "event_type": "case",
+        "phase": "finished",
+        "run_id": manifest["run_id"],
+        "profile_id": manifest["profile"]["id"],
+        "implementation": entry.implementation_id,
+        "case_id": row.get("case_id", ""),
+        "repeat_index": row.get("repeat_index", ""),
+        "warmup": row.get("warmup", ""),
+        "status": row["status"],
+        "metric": row.get("ns_per_iteration") or row.get("legacy_cycles_per_iteration", ""),
+        "metric_kind": "ns/iter" if row.get("ns_per_iteration") else ("cycles/iter" if row.get("legacy_cycles_per_iteration") else ""),
+        "elapsed_ns": row.get("elapsed_ns", ""),
+        "timer_kind": row.get("timer_kind", ""),
+        "step_index": step_index,
+        "step_total": step_total,
+        "message": f"Finished {execution_name}",
+    }
+    for field in RESULT_FIELD_ORDER:
+        event_payload.setdefault(field, stringify(live_row.get(field, "")))
+    _event(stream, events, **event_payload)
+
+
+def _with_temp_artifact_paths(row: dict[str, str], raw_log_ref: str) -> dict[str, str]:
+    live_row = dict(row)
+    live_row["log_file"] = raw_log_ref
+    live_row["raw_file"] = raw_log_ref
+    return live_row

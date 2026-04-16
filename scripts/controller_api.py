@@ -6,9 +6,11 @@ import sys
 from pathlib import Path
 
 from benchkit.build import build_assets
+from benchkit.common import RESULT_FIELD_ORDER
 from benchkit.catalog import implementation_catalog_rows
-from benchkit.history import load_index_rows, load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
+from benchkit.history import delete_run_artifact, load_index_rows, load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
 from benchkit.profiles import (
+    delete_custom_profile,
     duplicate_to_custom,
     load_profile,
     profile_detail_rows,
@@ -153,6 +155,18 @@ def command_raw(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_delete_run(args: argparse.Namespace) -> int:
+    delete_run_artifact(args.run_id)
+    print_tsv([{"status": "ok", "run_id": args.run_id}])
+    return 0
+
+
+def command_delete_custom_profile(args: argparse.Namespace) -> int:
+    deleted = delete_custom_profile(args.profile_id)
+    print_tsv([{"status": "ok", "profile_id": args.profile_id, "path": str(deleted)}])
+    return 0
+
+
 def _run_with_events(result_runner, profile_label: str) -> int:
     headers_printed = False
 
@@ -175,6 +189,17 @@ def _run_with_events(result_runner, profile_label: str) -> int:
             "step_index",
             "step_total",
             "message",
+            *[field for field in RESULT_FIELD_ORDER if field not in {
+                "run_id",
+                "profile_id",
+                "implementation",
+                "case_id",
+                "repeat_index",
+                "warmup",
+                "status",
+                "elapsed_ns",
+                "timer_kind",
+            }],
         ]
         if not headers_printed:
             sys.stdout.write("\t".join(headers) + "\n")
@@ -262,6 +287,14 @@ def build_parser() -> argparse.ArgumentParser:
     raw = subparsers.add_parser("raw")
     raw.add_argument("relative_path")
     raw.set_defaults(handler=command_raw)
+
+    delete_run = subparsers.add_parser("delete-run")
+    delete_run.add_argument("run_id")
+    delete_run.set_defaults(handler=command_delete_run)
+
+    delete_profile = subparsers.add_parser("delete-custom-profile")
+    delete_profile.add_argument("profile_id")
+    delete_profile.set_defaults(handler=command_delete_custom_profile)
 
     run_cmd = subparsers.add_parser("run-profile")
     run_cmd.add_argument("profile_id")

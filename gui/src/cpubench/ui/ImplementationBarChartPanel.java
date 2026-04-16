@@ -2,7 +2,6 @@ package cpubench.ui;
 
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -24,7 +23,7 @@ public final class ImplementationBarChartPanel extends JPanel {
     public ImplementationBarChartPanel() {
         setOpaque(true);
         setBackground(UiPalette.PANEL);
-        setBorder(DarkTheme.panelBorder());
+        setBorder(javax.swing.BorderFactory.createEmptyBorder(UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD));
         setPreferredSize(new Dimension(360, 300));
     }
 
@@ -68,8 +67,6 @@ public final class ImplementationBarChartPanel extends JPanel {
         int chartBottom = getHeight() - 48;
         int chartHeight = chartBottom - chartTop;
         int barWidth = Math.max(24, (chartRight - chartLeft - 12 * (bars.size() - 1)) / Math.max(1, bars.size()));
-        FontMetrics metrics = g2.getFontMetrics(UiPalette.BODY);
-
         for (int index = 0; index < bars.size(); index += 1) {
             Bar bar = bars.get(index);
             int x = chartLeft + index * (barWidth + 12);
@@ -81,19 +78,9 @@ public final class ImplementationBarChartPanel extends JPanel {
             g2.drawString(String.format("%.2f", bar.value()), x, y - 6);
             g2.setColor(UiPalette.MUTED);
             LanguageIconRegistry.icon(bar.label(), 16).paintIcon(this, g2, x + Math.max(0, barWidth / 2 - 8), chartBottom + 4);
-            drawCentered(g2, abbreviate(bar.label(), 16), x + barWidth / 2, chartBottom + metrics.getHeight());
         }
         g2.setColor(UiPalette.MUTED);
         g2.drawString(unit, 18, getHeight() - 16);
         g2.dispose();
-    }
-
-    private static String abbreviate(String text, int max) {
-        return text.length() <= max ? text : text.substring(0, max - 1) + "…";
-    }
-
-    private static void drawCentered(Graphics2D graphics, String text, int x, int y) {
-        int width = graphics.getFontMetrics().stringWidth(text);
-        graphics.drawString(text, x - width / 2, y);
     }
 }

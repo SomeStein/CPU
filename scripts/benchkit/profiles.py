@@ -222,6 +222,16 @@ def duplicate_to_custom(profile_id: str, new_profile_id: str, new_name: str | No
     return save_custom_profile(payload)
 
 
+def delete_custom_profile(profile_id: str) -> Path:
+    source, path = profile_location(profile_id)
+    if source != "custom":
+        raise ValueError(f"Profile '{profile_id}' is not a custom profile.")
+    if not path.exists():
+        raise FileNotFoundError(f"Profile '{profile_id}' does not exist.")
+    path.unlink()
+    return path
+
+
 def validation_rows(payload: dict, *, target_path: Path | None = None) -> list[dict[str, str]]:
     errors = validate_profile(payload, target_path=target_path)
     if not errors:

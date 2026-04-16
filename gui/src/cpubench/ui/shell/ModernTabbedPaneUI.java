@@ -19,15 +19,15 @@ public final class ModernTabbedPaneUI extends BasicTabbedPaneUI {
     @Override
     protected void installDefaults() {
         super.installDefaults();
-        tabAreaInsets = new Insets(6, 10, 0, 10);
-        contentBorderInsets = new Insets(10, 0, 0, 0);
+        tabAreaInsets = new Insets(2, 8, 0, 8);
+        contentBorderInsets = new Insets(2, 0, 0, 0);
         selectedTabPadInsets = new Insets(0, 0, 0, 0);
-        tabInsets = new Insets(9, 14, 9, 14);
+        tabInsets = new Insets(5, 10, 5, 10);
     }
 
     @Override
     protected Insets getTabInsets(int tabPlacement, int tabIndex) {
-        return new Insets(9, 14, 9, 14);
+        return new Insets(5, 10, 5, 10);
     }
 
     @Override
@@ -35,17 +35,17 @@ public final class ModernTabbedPaneUI extends BasicTabbedPaneUI {
         Graphics2D g2 = (Graphics2D) graphics.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setColor(isSelected ? UiPalette.SURFACE_ALT : UiPalette.PANEL_ALT);
-        g2.fill(new RoundRectangle2D.Double(x + 1.0, y + 2.0, w - 2.0, h + 4.0, 14.0, 14.0));
+        g2.fill(new RoundRectangle2D.Double(x + 1.0, y + 4.0, w - 2.0, h + 2.0, 12.0, 12.0));
         g2.setColor(isSelected ? UiPalette.ACCENT : UiPalette.BORDER);
         g2.setStroke(new BasicStroke(isSelected ? 1.4f : 1.0f));
-        g2.draw(new RoundRectangle2D.Double(x + 1.0, y + 2.0, w - 2.0, h + 4.0, 14.0, 14.0));
+        g2.draw(new RoundRectangle2D.Double(x + 1.0, y + 4.0, w - 2.0, h + 2.0, 12.0, 12.0));
         g2.dispose();
     }
 
     @Override
     protected void paintText(Graphics graphics, int tabPlacement, Font font, FontMetrics metrics, int tabIndex, String title, Rectangle textRect, boolean isSelected) {
         Graphics2D g2 = (Graphics2D) graphics.create();
-        g2.setFont(font.deriveFont(Font.BOLD, 13f));
+        g2.setFont(font.deriveFont(Font.BOLD, 12f));
         g2.setColor(isSelected ? UiPalette.TEXT : UiPalette.MUTED);
         BasicGraphicsUtils.drawStringUnderlineCharAt(tabPane, g2, title, tabPane.getDisplayedMnemonicIndexAt(tabIndex), textRect.x, textRect.y + metrics.getAscent());
         g2.dispose();
@@ -65,7 +65,7 @@ public final class ModernTabbedPaneUI extends BasicTabbedPaneUI {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         int y = calculateTabAreaHeight(tabPlacement, runCount, maxTabHeight);
         g2.setColor(UiPalette.BORDER);
-        g2.draw(new RoundRectangle2D.Double(0.5, y + 0.5, tabPane.getWidth() - 2.0, tabPane.getHeight() - y - 2.0, 18.0, 18.0));
+        g2.drawLine(0, y + 1, tabPane.getWidth(), y + 1);
         g2.dispose();
     }
 

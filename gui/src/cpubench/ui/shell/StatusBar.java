@@ -11,7 +11,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
-import cpubench.ui.DarkTheme;
 import cpubench.ui.UiPalette;
 
 public final class StatusBar extends JPanel {
@@ -94,7 +93,7 @@ public final class StatusBar extends JPanel {
         button.setBackground(background);
         button.setForeground(pickForeground(background));
         button.setFocusPainted(false);
-        button.setBorder(DarkTheme.panelBorder());
+        button.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
     }
 
     private static Color pickForeground(Color background) {

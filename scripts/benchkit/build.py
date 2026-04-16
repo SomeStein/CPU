@@ -34,6 +34,20 @@ def _macos_sdk_flags() -> list[str]:
     return ["-isysroot", sdk_path] if sdk_path else []
 
 
+def _macos_cpp_flags() -> list[str]:
+    if HOST_OS != "macos":
+        return []
+    flags = _macos_sdk_flags()
+    if not flags:
+        return []
+    sdk_path = Path(flags[1])
+    libcxx_headers = sdk_path / "usr" / "include" / "c++" / "v1"
+    extra = ["-stdlib=libc++"]
+    if libcxx_headers.exists():
+        extra.extend(["-isystem", str(libcxx_headers)])
+    return [*flags, *extra]
+
+
 def _find_compiler(candidates: list[str]) -> str | None:
     for candidate in candidates:
         path = shutil.which(candidate)
@@ -118,6 +132,7 @@ def build_compiled_entry(entry: ImplementationEntry, *, required: bool) -> Path:
                     "-std=c++17",
                     "-Wall",
                     "-Wextra",
+                    *_macos_cpp_flags(),
                     "-o",
                     str(entry.binary_path),
                     str(entry.source_path),

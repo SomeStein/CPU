@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -44,6 +46,7 @@ import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -65,6 +68,15 @@ import cpubench.ui.icons.LanguageListCellRenderer;
 import cpubench.ui.shell.ActivityBar.Activity;
 
 public final class ShellFrame {
+    private static final List<String> RESULT_SELECTION_KEYS = List.of("run_id", "implementation", "case_id", "warmup", "repeat_index");
+    private static final String HOME_KEY = "home";
+    private static final String GLOBAL_KEY = "global";
+    private static final String MONITOR_KEY = "monitor";
+    private static final String BUILDER_KEY = "builder";
+    private static final String RUN_OVERVIEW_KEY = "run";
+    private static final String ARTIFACTS_KEY = "artifacts";
+    private static final DateTimeFormatter LIVE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
     private static final List<String> LIVE_EVENT_HEADERS = List.of(
         "event_type",
         "phase",
@@ -82,6 +94,62 @@ public final class ShellFrame {
         "step_index",
         "step_total",
         "message"
+    );
+    private static final List<String> RUN_HEADERS = List.of(
+        "run_id",
+        "run_number",
+        "started_at",
+        "profile_id",
+        "profile_name",
+        "host_os",
+        "host_arch",
+        "status",
+        "result_count",
+        "implementation_count",
+        "case_count",
+        "best_metric_value",
+        "best_metric_kind"
+    );
+    private static final List<String> RESULT_HEADERS = List.of(
+        "run_id",
+        "run_number",
+        "started_at",
+        "profile_id",
+        "profile_name",
+        "host_os",
+        "host_arch",
+        "implementation",
+        "language",
+        "variant",
+        "case_id",
+        "warmup",
+        "repeat_index",
+        "iterations",
+        "parallel_chains",
+        "loop_trip_count",
+        "remainder",
+        "timer_kind",
+        "elapsed_ns",
+        "ns_per_iteration",
+        "ns_per_add",
+        "legacy_cycles",
+        "legacy_cycles_per_iteration",
+        "legacy_cycles_per_add",
+        "result_checksum",
+        "requested_priority_mode",
+        "requested_affinity_mode",
+        "applied_priority_mode",
+        "applied_affinity_mode",
+        "scheduler_notes",
+        "pid",
+        "tid",
+        "runtime_name",
+        "runtime_source",
+        "status",
+        "log_file",
+        "raw_file",
+        "error_message",
+        "platform_extras_json"
     );
 
     private final BackendClient backend;
@@ -106,6 +174,10 @@ public final class ShellFrame {
     private final JTextArea rawLogArea = buildTextArea();
     private final JTextArea manifestArea = buildTextArea();
     private final JTextArea liveLogArea = buildTextArea();
+    private final JTextArea homeGuideArea = buildTextArea();
+    private final JTextArea homeRecentRunsArea = buildTextArea();
+    private final JTextArea homeProfilesArea = buildTextArea();
+    private final JTextArea homeBestArea = buildTextArea();
 
     private final JComboBox<String> runImplementationFilter = new JComboBox<>(new String[] {"All"});
     private final JComboBox<String> runCaseFilter = new JComboBox<>(new String[] {"All"});
@@ -135,8 +207,18 @@ public final class ShellFrame {
     private String pendingRunSelection = "";
     private Process activeProcess;
     private List<String> runEventHeaders = List.of();
-    private final List<Map<String, String>> liveMetricRows = new ArrayList<>();
     private Activity activeActivity = Activity.RUNS;
+    private final Timer idleRefreshTimer;
+    private final Timer liveUpdateTimer;
+    private boolean refreshInFlight;
+    private boolean suppressFilterActions;
+    private Map<String, Object> liveManifest = Map.of();
+    private final Map<String, Color> liveSeriesColors = new LinkedHashMap<>();
+    private final List<Map<String, String>> pendingLiveEvents = new ArrayList<>();
+    private final List<Map<String, String>> liveRunRows = new ArrayList<>();
+    private final List<Map<String, String>> liveGlobalRows = new ArrayList<>();
+    private final List<Map<String, String>> liveEventRows = new ArrayList<>();
+    private String liveRunStatus = "running";
 
     public ShellFrame(BackendClient backend) {
         this.backend = backend;
@@ -147,6 +229,10 @@ public final class ShellFrame {
         this.workspaceTabs = new WorkspaceTabs();
         this.statusBar = new StatusBar();
         this.profileBuilderPanel = new ProfileBuilderPanel(backend, this::refreshAll, this::startRunProfileFile, this::selectProfile);
+        this.idleRefreshTimer = new Timer(4000, event -> refreshAll(false));
+        this.idleRefreshTimer.setRepeats(true);
+        this.liveUpdateTimer = new Timer(90, event -> flushPendingLiveEvents());
+        this.liveUpdateTimer.setRepeats(false);
         buildUi();
     }
 
@@ -155,6 +241,7 @@ public final class ShellFrame {
         frame.setSize(1480, 920);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+        idleRefreshTimer.start();
     }
 
     private void buildUi() {
@@ -191,13 +278,11 @@ public final class ShellFrame {
         sidePanel.addPanel(Activity.DOCS, buildDocsSideView());
         sidePanel.showPanel(Activity.RUNS);
 
-        openScreen("global", "Global Overview", IconFactory.chartIcon(14, UiPalette.TEXT), buildGlobalOverviewScreen(), false);
-        openScreen("monitor", "Live Monitor", IconFactory.radarIcon(14, UiPalette.TEXT), buildLiveMonitorScreen(), false);
-        openScreen("builder", "Run Config", IconFactory.docsIcon(14, UiPalette.TEXT), profileBuilderPanel, false);
+        openScreen(HOME_KEY, "Home", IconFactory.logsIcon(14, UiPalette.ACCENT), buildHomeScreen(), false);
         workspaceTabs.setSelectedIndex(0);
 
         statusBar.runButton().addActionListener(event -> startRun());
-        statusBar.refreshButton().addActionListener(event -> refreshAll());
+        statusBar.refreshButton().addActionListener(event -> refreshAll(true));
         statusBar.stopButton().addActionListener(event -> stopRun());
         statusBar.profileSelector().addActionListener(event -> {
             if (statusBar.profileSelector().getSelectedItem() != null) {
@@ -219,9 +304,11 @@ public final class ShellFrame {
         JMenuBar bar = new JMenuBar();
 
         JMenu file = new JMenu("File");
-        file.add(menuItem("Refresh", event -> refreshAll()));
+        file.add(menuItem("Refresh", event -> refreshAll(true)));
         file.add(menuItem("Run Selected Profile", event -> startRun()));
-        file.add(menuItem("Open Builder", event -> workspaceTabs.setSelectedComponent(tabsByKey.get("builder"))));
+        file.add(menuItem("Open Builder", event -> openBuilderTab()));
+        file.add(menuItem("Open Global Overview", event -> openGlobalOverviewScreen()));
+        file.add(menuItem("Open Live Monitor", event -> openLiveMonitorTab()));
         file.add(menuItem("Exit", event -> frame.dispose()));
 
         JMenu help = new JMenu("Help");
@@ -305,15 +392,51 @@ public final class ShellFrame {
     private void installFilterInteractions() {
         runImplementationFilter.setRenderer(new LanguageListCellRenderer());
         globalImplementationFilter.setRenderer(new LanguageListCellRenderer());
-        runImplementationFilter.addActionListener(event -> applyRunFilters());
-        runCaseFilter.addActionListener(event -> applyRunFilters());
-        runStatusFilter.addActionListener(event -> applyRunFilters());
-        runMeasuredOnlyToggle.addActionListener(event -> applyRunFilters());
-        globalProfileFilter.addActionListener(event -> applyGlobalFilters());
-        globalImplementationFilter.addActionListener(event -> applyGlobalFilters());
-        globalCaseFilter.addActionListener(event -> applyGlobalFilters());
-        globalStatusFilter.addActionListener(event -> applyGlobalFilters());
-        globalMeasuredOnlyToggle.addActionListener(event -> applyGlobalFilters());
+        runImplementationFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyRunFilters();
+            }
+        });
+        runCaseFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyRunFilters();
+            }
+        });
+        runStatusFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyRunFilters();
+            }
+        });
+        runMeasuredOnlyToggle.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyRunFilters();
+            }
+        });
+        globalProfileFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyGlobalFilters();
+            }
+        });
+        globalImplementationFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyGlobalFilters();
+            }
+        });
+        globalCaseFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyGlobalFilters();
+            }
+        });
+        globalStatusFilter.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyGlobalFilters();
+            }
+        });
+        globalMeasuredOnlyToggle.addActionListener(event -> {
+            if (!suppressFilterActions) {
+                applyGlobalFilters();
+            }
+        });
     }
 
     private void installWindowShortcuts() {
@@ -321,14 +444,37 @@ public final class ShellFrame {
         frame.getRootPane().getActionMap().put("refresh", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                refreshAll();
+                refreshAll(true);
             }
         });
     }
 
     private JComponent buildRunsSideView() {
         JPanel panel = sideCard("Runs");
-        panel.add(labelledField("Search", runSearchField), BorderLayout.NORTH);
+        JPanel top = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
+        top.setOpaque(false);
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, UiPalette.GAP_SM, 0));
+        buttons.setOpaque(false);
+        JButton openRun = button("Open Run", UiPalette.SURFACE);
+        JButton openArtifacts = button("Artifacts", UiPalette.SURFACE_ALT);
+        JButton deleteRun = button("Delete Run", UiPalette.WARNING);
+        openRun.addActionListener(event -> {
+            if (!state.currentRunId().isBlank()) {
+                openRunOverviewTab();
+            }
+        });
+        openArtifacts.addActionListener(event -> {
+            if (!state.currentRunId().isBlank()) {
+                openArtifactsTab();
+            }
+        });
+        deleteRun.addActionListener(event -> deleteSelectedRun());
+        buttons.add(openRun);
+        buttons.add(openArtifacts);
+        buttons.add(deleteRun);
+        top.add(labelledField("Search", runSearchField), BorderLayout.NORTH);
+        top.add(buttons, BorderLayout.SOUTH);
+        panel.add(top, BorderLayout.NORTH);
         panel.add(tableScroll(runsTable), BorderLayout.CENTER);
         panel.add(textSection("Selected Run", selectedRunArea, null), BorderLayout.SOUTH);
         return panel;
@@ -336,6 +482,9 @@ public final class ShellFrame {
 
     private JComponent buildAnalysisSideView() {
         JPanel shell = sideCard("Analysis Filters");
+        JButton openGlobal = button("Open Global Overview", UiPalette.SURFACE);
+        openGlobal.addActionListener(event -> openGlobalOverviewScreen());
+        shell.add(openGlobal, BorderLayout.NORTH);
         JPanel stack = new JPanel();
         stack.setOpaque(false);
         stack.setLayout(new javax.swing.BoxLayout(stack, javax.swing.BoxLayout.Y_AXIS));
@@ -348,7 +497,13 @@ public final class ShellFrame {
 
     private JComponent buildMonitorSideView() {
         JPanel panel = sideCard("Monitor");
-        panel.add(textSection("Live Status", liveStatusArea, new Dimension(0, 180)), BorderLayout.NORTH);
+        JPanel top = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
+        top.setOpaque(false);
+        JButton openMonitor = button("Open Live Monitor", UiPalette.SURFACE);
+        openMonitor.addActionListener(event -> openLiveMonitorTab());
+        top.add(openMonitor, BorderLayout.NORTH);
+        top.add(textSection("Live Status", liveStatusArea, new Dimension(0, 180)), BorderLayout.CENTER);
+        panel.add(top, BorderLayout.NORTH);
         panel.add(textSection("Event Tail", monitorTailArea, null), BorderLayout.CENTER);
         return panel;
     }
@@ -374,9 +529,15 @@ public final class ShellFrame {
 
     private JComponent buildConfigSideView() {
         JPanel panel = sideCard("Profile");
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, UiPalette.GAP_SM, 0));
+        buttons.setOpaque(false);
         JButton builderButton = button("Open Builder", UiPalette.ACCENT);
-        builderButton.addActionListener(event -> workspaceTabs.setSelectedComponent(tabsByKey.get("builder")));
-        panel.add(builderButton, BorderLayout.NORTH);
+        JButton deleteButton = button("Delete Custom", UiPalette.WARNING);
+        builderButton.addActionListener(event -> openBuilderTab());
+        deleteButton.addActionListener(event -> deleteSelectedCustomProfile());
+        buttons.add(builderButton);
+        buttons.add(deleteButton);
+        panel.add(buttons, BorderLayout.NORTH);
         panel.add(textSection("Profile Preview", profilePreviewArea, null), BorderLayout.CENTER);
         return panel;
     }
@@ -391,6 +552,39 @@ public final class ShellFrame {
         buttons.add(docButton("AGENTS.md", Path.of("AGENTS.md")));
         panel.add(buttons, BorderLayout.NORTH);
         return panel;
+    }
+
+    private JComponent buildHomeScreen() {
+        homeGuideArea.setText(
+            "CPU Lab\n\n"
+                + "1. Pick or build a profile.\n"
+                + "2. Start a run from the status bar.\n"
+                + "3. Open Run Overview, Global Overview, or Artifacts only when you need them.\n"
+                + "4. Live Monitor will auto-focus during active runs.\n"
+                + "5. Use the side panels to inspect, compare, and clean up tracked data."
+        );
+
+        JPanel docsButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, UiPalette.GAP_SM, 0));
+        docsButtons.setOpaque(false);
+        docsButtons.add(docButton("README", Path.of("README.md")));
+        docsButtons.add(docButton("Architecture", Path.of("docs", "ARCHITECTURE.md")));
+        docsButtons.add(docButton("Timing", Path.of("docs", "TIMING_ISOLATION.md")));
+
+        JPanel left = new JPanel(new BorderLayout(0, UiPalette.GAP_MD));
+        left.setOpaque(false);
+        left.add(textSection("How To Use", homeGuideArea, null), BorderLayout.CENTER);
+        left.add(docsButtons, BorderLayout.SOUTH);
+
+        JPanel right = new JPanel(new BorderLayout(0, UiPalette.GAP_MD));
+        right.setOpaque(false);
+        right.add(textSection("Recent Runs", homeRecentRunsArea, new Dimension(0, 220)), BorderLayout.NORTH);
+        right.add(textSection("Profiles", homeProfilesArea, new Dimension(0, 180)), BorderLayout.CENTER);
+        right.add(textSection("Best Recent Snapshot", homeBestArea, new Dimension(0, 140)), BorderLayout.SOUTH);
+
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
+        split.setResizeWeight(0.56);
+        DarkTheme.styleSplitPane(split);
+        return split;
     }
 
     private JComponent buildGlobalOverviewScreen() {
@@ -451,8 +645,18 @@ public final class ShellFrame {
     }
 
     private void refreshAll() {
-        setStatus("Refreshing data", UiPalette.INFO);
-        setControlsEnabled(false);
+        refreshAll(true);
+    }
+
+    private void refreshAll(boolean announce) {
+        if (refreshInFlight || (!announce && activeProcess != null)) {
+            return;
+        }
+        refreshInFlight = true;
+        if (announce) {
+            setStatus("Refreshing data", UiPalette.INFO);
+            setControlsEnabled(false);
+        }
 
         new SwingWorker<Void, Void>() {
             private TableData loadedProfiles = TableData.empty();
@@ -479,26 +683,38 @@ public final class ShellFrame {
                     state.setGlobalResults(loadedGlobalResults);
                     populateProfileSelector();
                     profileBuilderPanel.reloadLookups(state.profiles(), state.implementationCatalog());
+                    updateHomeOverview();
                     applyRunsSearch();
                     populateGlobalFilters();
                     applyGlobalFilters();
                     if (!pendingRunSelection.isBlank()) {
+                        if (Objects.equals(state.liveRunId(), pendingRunSelection)) {
+                            state.clearLiveRun();
+                            liveManifest = Map.of();
+                            applyRunsSearch();
+                            populateGlobalFilters();
+                            applyGlobalFilters();
+                        }
                         selectRunRow(pendingRunSelection, true);
                         pendingRunSelection = "";
-                    } else if (!state.currentRunId().isBlank()) {
+                    } else if (!state.currentRunId().isBlank() && hasDisplayedRun(state.currentRunId())) {
                         selectRunRow(state.currentRunId(), false);
-                    } else if (runsModel.getRowCount() > 0) {
-                        runsTable.setRowSelectionInterval(0, 0);
-                        loadSelectedRun(false);
+                    } else if (!state.currentRunId().isBlank()) {
+                        state.setCurrentRunId("");
+                        clearRunWorkspace();
+                        workspaceTabs.setSelectedComponent(tabsByKey.get(HOME_KEY));
                     } else {
                         clearRunWorkspace();
                     }
-                    setStatus("CPU Lab ready", UiPalette.SUCCESS);
+                    if (announce) {
+                        setStatus("CPU Lab ready", UiPalette.SUCCESS);
+                    }
                 } catch (Exception error) {
                     setStatus("Refresh failed", UiPalette.DANGER);
                     liveLogArea.append("[refresh-error] " + error.getMessage() + "\n");
                     statusBar.setHealth(UiPalette.DANGER);
                 } finally {
+                    refreshInFlight = false;
                     setControlsEnabled(true);
                 }
             }
@@ -559,13 +775,28 @@ public final class ShellFrame {
 
     private void applyRunsSearch() {
         String needle = runSearchField.getText() == null ? "" : runSearchField.getText().trim().toLowerCase();
+        TableData displayedRuns = state.displayedRuns();
         List<Map<String, String>> rows = new ArrayList<>();
-        for (Map<String, String> row : state.runs().asMaps()) {
+        for (Map<String, String> row : displayedRuns.asMaps()) {
             if (needle.isBlank() || matchesRunSearch(row, needle)) {
                 rows.add(row);
             }
         }
-        applyTable(runsTable, runsModel, mapsToTableData(rows, state.runs().headers()));
+        rows.sort((left, right) -> {
+            int byNumber = Integer.compare(parseInt(right.get("run_number")), parseInt(left.get("run_number")));
+            if (byNumber != 0) {
+                return byNumber;
+            }
+            return right.getOrDefault("run_id", "").compareTo(left.getOrDefault("run_id", ""));
+        });
+        applyTable(runsTable, runsModel, mapsToTableData(rows, displayedRuns.headers()));
+        if (!state.currentRunId().isBlank()) {
+            if (!restoreSelectionByKey(runsTable, runsModel, "run_id", state.currentRunId())) {
+                runsTable.clearSelection();
+            }
+        } else {
+            runsTable.clearSelection();
+        }
     }
 
     private static boolean matchesRunSearch(Map<String, String> row, String needle) {
@@ -593,6 +824,21 @@ public final class ShellFrame {
     }
 
     private void loadRun(String runId, boolean openTab) {
+        if (Objects.equals(runId, state.liveRunId())) {
+            state.setCurrentRunId(runId);
+            state.setRunResults(TableData.empty());
+            state.setRunEvents(TableData.empty());
+            applyTable(eventsTable, eventsModel, state.displayedRunEvents());
+            populateRunFilters();
+            applyRunFilters();
+            renderLiveMonitorSnapshot(null);
+            if (openTab) {
+                openRunOverviewTab();
+            }
+            statusBar.setLastEvent("Loaded live " + runId);
+            setStatus("Loaded " + runId, UiPalette.SUCCESS);
+            return;
+        }
         setStatus("Loading " + runId, UiPalette.INFO);
         new SwingWorker<Void, Void>() {
             private TableData loadedResults = TableData.empty();
@@ -614,7 +860,7 @@ public final class ShellFrame {
                     state.setRunResults(loadedResults);
                     state.setRunEvents(loadedEvents);
                     state.setRunManifest(loadedManifest);
-                    applyTable(eventsTable, eventsModel, state.runEvents());
+                    applyTable(eventsTable, eventsModel, state.displayedRunEvents());
                     populateRunFilters();
                     applyRunFilters();
                     renderLiveMonitorSnapshot(null);
@@ -632,32 +878,38 @@ public final class ShellFrame {
     }
 
     private void populateRunFilters() {
-        repopulateCombo(runImplementationFilter, state.runResults().distinctValues("implementation"));
-        repopulateCombo(runCaseFilter, state.runResults().distinctValues("case_id"));
+        repopulateCombo(runImplementationFilter, state.displayedRunResults().distinctValues("implementation"));
+        repopulateCombo(runCaseFilter, state.displayedRunResults().distinctValues("case_id"));
     }
 
     private void populateGlobalFilters() {
-        repopulateCombo(globalProfileFilter, state.globalResults().distinctValues("profile_id"));
-        repopulateCombo(globalImplementationFilter, state.globalResults().distinctValues("implementation"));
-        repopulateCombo(globalCaseFilter, state.globalResults().distinctValues("case_id"));
+        repopulateCombo(globalProfileFilter, state.displayedGlobalResults().distinctValues("profile_id"));
+        repopulateCombo(globalImplementationFilter, state.displayedGlobalResults().distinctValues("implementation"));
+        repopulateCombo(globalCaseFilter, state.displayedGlobalResults().distinctValues("case_id"));
     }
 
     private void repopulateCombo(JComboBox<String> combo, Set<String> values) {
         String previous = (String) combo.getSelectedItem();
-        combo.removeAllItems();
-        combo.addItem("All");
-        for (String value : values) {
-            combo.addItem(value);
-        }
-        if (previous != null) {
-            combo.setSelectedItem(previous);
-        }
-        if (combo.getSelectedItem() == null) {
-            combo.setSelectedIndex(0);
+        suppressFilterActions = true;
+        try {
+            combo.removeAllItems();
+            combo.addItem("All");
+            for (String value : values) {
+                combo.addItem(value);
+            }
+            if (previous != null) {
+                combo.setSelectedItem(previous);
+            }
+            if (combo.getSelectedItem() == null) {
+                combo.setSelectedIndex(0);
+            }
+        } finally {
+            suppressFilterActions = false;
         }
     }
 
     private void applyRunFilters() {
+        String selectedKey = selectedCompositeKey(resultsTable, resultsModel, RESULT_SELECTION_KEYS);
         state.setRunFilter(currentRunFilter());
         TableData filtered = state.filteredRunResults();
         applyTable(resultsTable, resultsModel, filtered);
@@ -665,20 +917,31 @@ public final class ShellFrame {
         renderSelectedRunSummary();
         renderLiveMonitorSnapshot(null);
         if (resultsModel.getRowCount() > 0) {
-            resultsTable.setRowSelectionInterval(0, 0);
-            inspectSelectedRunResult(false);
+            if (!restoreSelectionByCompositeKey(resultsTable, resultsModel, RESULT_SELECTION_KEYS, selectedKey)) {
+                resultsTable.setRowSelectionInterval(0, 0);
+            }
+        } else {
+            artifactSummaryArea.setText("Select a result row to inspect.");
+            detailArea.setText("No result row matches the current run filter.");
+            rawLogArea.setText("");
         }
     }
 
     private void applyGlobalFilters() {
+        String selectedKey = selectedCompositeKey(globalResultsTable, globalResultsModel, RESULT_SELECTION_KEYS);
         state.setGlobalFilter(currentGlobalFilter());
         TableData filtered = state.filteredGlobalResults();
         applyTable(globalResultsTable, globalResultsModel, filtered);
         updateGlobalCharts(filtered.asMaps());
         renderGlobalSummary(filtered.asMaps());
         if (globalResultsModel.getRowCount() > 0) {
-            globalResultsTable.setRowSelectionInterval(0, 0);
-            inspectSelectedGlobalResult(false);
+            if (!restoreSelectionByCompositeKey(globalResultsTable, globalResultsModel, RESULT_SELECTION_KEYS, selectedKey)) {
+                globalResultsTable.setRowSelectionInterval(0, 0);
+            }
+        } else {
+            artifactSummaryArea.setText("Select a result row to inspect.");
+            detailArea.setText("No result row matches the current global filter.");
+            rawLogArea.setText("");
         }
     }
 
@@ -709,7 +972,7 @@ public final class ShellFrame {
             runOverviewSummaryArea.setText("No run selected.");
             return;
         }
-        Map<String, String> run = findRow(state.runs().asMaps(), "run_id", state.currentRunId());
+        Map<String, String> run = findRow(state.displayedRuns().asMaps(), "run_id", state.currentRunId());
         TableData filteredData = state.filteredRunResults();
         List<Map<String, String>> filtered = filteredData.asMaps();
         builder.append("Run: ").append(state.currentRunId()).append('\n');
@@ -759,7 +1022,7 @@ public final class ShellFrame {
             return;
         }
 
-        List<Map<String, String>> events = state.runEvents().asMaps();
+        List<Map<String, String>> events = state.displayedRunEvents().asMaps();
         builder.append("Loaded run: ").append(state.currentRunId()).append('\n');
         builder.append("Recorded events: ").append(events.size()).append('\n');
         builder.append("Finished samples: ").append(countBy(events, "phase", "finished")).append('\n');
@@ -778,7 +1041,7 @@ public final class ShellFrame {
 
     private void renderGlobalSummary(List<Map<String, String>> rows) {
         StringBuilder builder = new StringBuilder();
-        builder.append("Tracked runs: ").append(state.runs().rows().size()).append('\n');
+        builder.append("Tracked runs: ").append(state.displayedRuns().rows().size()).append('\n');
         builder.append("Visible samples: ").append(rows.size()).append('\n');
         builder.append("Visible profiles: ").append(joinDistinct(rows, "profile_id")).append('\n');
         builder.append("Visible implementations: ").append(joinDistinct(rows, "implementation")).append('\n');
@@ -814,11 +1077,12 @@ public final class ShellFrame {
         List<InteractiveTrendChart.Series> series = new ArrayList<>();
         for (Map.Entry<String, List<PointRecord>> entry : grouped.entrySet()) {
             String implId = entry.getValue().isEmpty() ? "" : entry.getValue().get(0).implId();
-            series.add(new InteractiveTrendChart.Series(implId, colors.get(entry.getKey()), entry.getValue()));
+            String caseId = entry.getValue().isEmpty() ? "" : entry.getValue().get(0).caseId();
+            series.add(new InteractiveTrendChart.Series(entry.getKey(), implId, caseId, colors.get(entry.getKey()), entry.getValue()));
         }
         runChart.setPresentation(
             state.currentRunId().isBlank() ? "Run Metric Trend" : "Run Metric Trend · " + state.currentRunId(),
-            rows.isEmpty() ? "No stored result rows match the current run filter." : "Drag to pan. Wheel to zoom.",
+            rows.isEmpty() ? "No stored result rows match the current run filter." : "Drag plot to pan. Drag axes to scale. Wheel to zoom.",
             "ns/iter",
             "Repeat"
         );
@@ -838,7 +1102,7 @@ public final class ShellFrame {
         int colorIndex = 0;
         Map<String, Color> colors = new LinkedHashMap<>();
 
-        List<Map<String, String>> orderedRuns = new ArrayList<>(state.runs().asMaps());
+        List<Map<String, String>> orderedRuns = new ArrayList<>(state.displayedRuns().asMaps());
         orderedRuns.sort(Comparator.comparingInt(row -> parseInt(row.get("run_number"))));
         Map<String, Integer> runIndex = new LinkedHashMap<>();
         int index = 1;
@@ -868,7 +1132,7 @@ public final class ShellFrame {
 
         List<InteractiveTrendChart.Series> series = new ArrayList<>();
         for (Map.Entry<String, List<PointRecord>> entry : grouped.entrySet()) {
-            series.add(new InteractiveTrendChart.Series(entry.getKey(), colors.get(entry.getKey()), entry.getValue()));
+            series.add(new InteractiveTrendChart.Series(entry.getKey(), entry.getKey(), "", colors.get(entry.getKey()), entry.getValue()));
         }
         globalChart.setPresentation(
             "Cross-Run Trend",
@@ -919,13 +1183,21 @@ public final class ShellFrame {
         monitorTailArea.setText("");
         liveStatusArea.setText("Waiting for controller events…\n");
         runEventHeaders = List.of();
-        liveMetricRows.clear();
+        liveSeriesColors.clear();
+        pendingLiveEvents.clear();
+        liveRunRows.clear();
+        liveGlobalRows.clear();
+        liveEventRows.clear();
+        liveRunStatus = "running";
+        liveUpdateTimer.stop();
+        liveManifest = Map.of();
+        state.clearLiveRun();
         state.setRunEvents(TableData.empty());
         applyTable(eventsTable, eventsModel, TableData.empty());
         liveChart.resetView();
         liveChart.setPresentation("Live Metric Trend", "Finished samples will appear here as the profile runs.", "ns/iter", "Repeat");
         liveChart.setSeries(List.of());
-        workspaceTabs.setSelectedComponent(tabsByKey.get("monitor"));
+        openLiveMonitorTab();
         setStatus("Running " + profileLabel, UiPalette.INFO);
 
         new SwingWorker<Integer, Map<String, String>>() {
@@ -953,13 +1225,18 @@ public final class ShellFrame {
 
             @Override
             protected void process(List<Map<String, String>> chunks) {
-                for (Map<String, String> event : chunks) {
-                    handleLiveEvent(event);
+                if (chunks.isEmpty()) {
+                    return;
+                }
+                pendingLiveEvents.addAll(chunks);
+                if (!liveUpdateTimer.isRunning()) {
+                    liveUpdateTimer.start();
                 }
             }
 
             @Override
             protected void done() {
+                flushPendingLiveEvents();
                 activeProcess = null;
                 statusBar.stopButton().setEnabled(false);
                 int exitCode = 1;
@@ -970,7 +1247,7 @@ public final class ShellFrame {
                 } finally {
                     setControlsEnabled(true);
                     if (!pendingRunSelection.isBlank()) {
-                        refreshAll();
+                        refreshAll(true);
                     } else if (exitCode == 0) {
                         setStatus("Run finished", UiPalette.SUCCESS);
                     } else {
@@ -988,47 +1265,187 @@ public final class ShellFrame {
         }
     }
 
-    private void handleLiveEvent(Map<String, String> event) {
-        appendLiveLog(event);
-        updateProgress(event);
-        renderLiveMonitorSnapshot(event);
-        pushLiveEventTable(event);
-        monitorTailArea.setText(monitorTailText(event));
-        statusBar.setLastEvent(event.getOrDefault("message", event.getOrDefault("phase", "")));
-        if ("finished".equals(event.get("phase"))) {
-            Map<String, String> sample = new LinkedHashMap<>();
-            sample.put("run_id", event.getOrDefault("run_id", ""));
-            sample.put("profile_id", event.getOrDefault("profile_id", ""));
-            sample.put("implementation", event.getOrDefault("implementation", ""));
-            sample.put("case_id", event.getOrDefault("case_id", ""));
-            sample.put("repeat_index", event.getOrDefault("repeat_index", ""));
-            sample.put("warmup", event.getOrDefault("warmup", ""));
-            sample.put("ns_per_iteration", "ns/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "");
-            sample.put("legacy_cycles_per_iteration", "cycles/iter".equals(event.getOrDefault("metric_kind", "")) ? event.getOrDefault("metric", "") : "");
-            sample.put("status", event.getOrDefault("status", ""));
-            sample.put("timer_kind", event.getOrDefault("timer_kind", ""));
-            sample.put("elapsed_ns", event.getOrDefault("elapsed_ns", ""));
-            liveMetricRows.add(sample);
-            String implementation = event.getOrDefault("implementation", "");
-            liveChart.appendPoint(
-                implementation,
-                new PointRecord(
-                    parseInt(event.getOrDefault("repeat_index", "0")),
-                    parseDouble(event.getOrDefault("metric", "0")),
-                    implementation,
-                    event.getOrDefault("case_id", ""),
-                    parseInt(event.getOrDefault("repeat_index", "0"))
-                )
-            );
+    private void flushPendingLiveEvents() {
+        if (pendingLiveEvents.isEmpty()) {
+            return;
         }
-        if ("completed".equals(event.get("phase"))) {
-            pendingRunSelection = event.getOrDefault("run_id", "");
-            state.setCurrentRunId(pendingRunSelection);
-            setStatus("Run complete: " + pendingRunSelection, UiPalette.SUCCESS);
+        List<Map<String, String>> batch = new ArrayList<>(pendingLiveEvents);
+        pendingLiveEvents.clear();
+
+        boolean runFiltersChanged = false;
+        boolean globalFiltersChanged = false;
+        boolean runsChanged = false;
+        boolean eventsChanged = false;
+        StringBuilder logBatch = new StringBuilder();
+        Map<String, String> lastEvent = batch.get(batch.size() - 1);
+
+        for (Map<String, String> event : batch) {
+            String phase = event.getOrDefault("phase", "");
+            if ("started".equals(phase)) {
+                beginLiveRunState(event);
+                runsChanged = true;
+                runFiltersChanged = true;
+                globalFiltersChanged = true;
+            } else if ("finished".equals(phase)) {
+                appendLiveResultState(event);
+                runsChanged = true;
+                runFiltersChanged = true;
+                globalFiltersChanged = true;
+            } else if ("completed".equals(phase)) {
+                pendingRunSelection = event.getOrDefault("run_id", "");
+                state.setCurrentRunId(pendingRunSelection);
+                liveRunStatus = event.getOrDefault("status", "success");
+                runsChanged = true;
+                setStatus(
+                    "Run complete: " + pendingRunSelection,
+                    Objects.equals("success", liveRunStatus) ? UiPalette.SUCCESS : UiPalette.WARNING
+                );
+            }
+            appendLiveLog(logBatch, event);
+            liveEventRows.add(event);
+            eventsChanged = true;
+        }
+
+        if (logBatch.length() > 0) {
+            liveLogArea.append(logBatch.toString());
+            liveLogArea.setCaretPosition(liveLogArea.getDocument().getLength());
+        }
+
+        updateProgress(lastEvent);
+        renderLiveMonitorSnapshot(lastEvent);
+        monitorTailArea.setText(monitorTailText(lastEvent));
+        statusBar.setLastEvent(lastEvent.getOrDefault("message", lastEvent.getOrDefault("phase", "")));
+
+        if (eventsChanged) {
+            state.setLiveRunEvents(mapsToTableData(liveEventRows, runEventHeaders.isEmpty() ? LIVE_EVENT_HEADERS : runEventHeaders));
+            applyTable(eventsTable, eventsModel, state.displayedRunEvents());
+        }
+        if (runFiltersChanged) {
+            state.setLiveRunResults(mapsToTableData(liveRunRows, RESULT_HEADERS));
+            if (!state.liveRunId().isBlank()) {
+                state.setLiveRuns(mapsToTableData(List.of(buildLiveRunSummary(liveRunStatus)), state.runs().headers().isEmpty() ? RUN_HEADERS : state.runs().headers()));
+            }
+        }
+        if (globalFiltersChanged) {
+            state.setLiveGlobalResults(mapsToTableData(liveGlobalRows, RESULT_HEADERS));
+        }
+        if (runsChanged) {
+            applyRunsSearch();
+            updateHomeOverview();
+        }
+        if (runFiltersChanged) {
+            populateRunFilters();
+            if (Objects.equals(state.currentRunId(), state.liveRunId())) {
+                applyRunFilters();
+            }
+        }
+        if (globalFiltersChanged) {
+            populateGlobalFilters();
+            applyGlobalFilters();
         }
     }
 
-    private void appendLiveLog(Map<String, String> event) {
+    private void beginLiveRunState(Map<String, String> event) {
+        String runId = event.getOrDefault("run_id", "");
+        String profileId = event.getOrDefault("profile_id", state.currentProfileId());
+        Map<String, String> profileRow = findRow(state.profiles().asMaps(), "profile_id", profileId);
+        liveRunRows.clear();
+        liveGlobalRows.clear();
+        liveEventRows.clear();
+        liveManifest = new LinkedHashMap<>();
+        liveManifest.put("run_id", runId);
+        liveManifest.put("profile_id", profileId);
+        liveManifest.put("profile_name", profileRow.getOrDefault("name", profileId));
+        liveManifest.put("started_at", LocalDateTime.now().format(LIVE_TIME));
+        liveRunStatus = "running";
+
+        state.setLiveRunId(runId);
+        state.setCurrentRunId(runId);
+    }
+
+    private void appendLiveResultState(Map<String, String> event) {
+        Map<String, String> row = resultRowFromEvent(event);
+        liveRunRows.add(row);
+        liveGlobalRows.add(row);
+
+        String implementation = row.getOrDefault("implementation", "");
+        String caseId = row.getOrDefault("case_id", "");
+        String seriesId = implementation + "::" + caseId;
+        Color color = liveSeriesColors.computeIfAbsent(seriesId, ignored -> UiPalette.seriesColor(liveSeriesColors.size()));
+        Double metric = metric(row);
+        if (metric != null) {
+            liveChart.appendPoint(
+                seriesId,
+                implementation,
+                caseId,
+                color,
+                new PointRecord(
+                    parseInt(row.getOrDefault("repeat_index", "0")),
+                    metric,
+                    implementation,
+                    caseId,
+                    parseInt(row.getOrDefault("repeat_index", "0"))
+                )
+            );
+        }
+
+        liveRunStatus = hasLiveFailures() ? "partial_failure" : "running";
+    }
+
+    private boolean hasLiveFailures() {
+        for (Map<String, String> row : liveRunRows) {
+            if (!Objects.equals("success", row.getOrDefault("status", ""))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<String, String> buildLiveRunSummary(String status) {
+        MetricSample best = bestMetric(liveRunRows);
+        Set<String> implementations = new LinkedHashSet<>();
+        Set<String> cases = new LinkedHashSet<>();
+        String hostOs = "";
+        String hostArch = "";
+        for (Map<String, String> row : liveRunRows) {
+            if (!Objects.equals("true", row.getOrDefault("warmup", "false"))) {
+                implementations.add(row.getOrDefault("implementation", ""));
+                cases.add(row.getOrDefault("case_id", ""));
+            }
+            if (hostOs.isBlank()) {
+                hostOs = row.getOrDefault("host_os", "");
+            }
+            if (hostArch.isBlank()) {
+                hostArch = row.getOrDefault("host_arch", "");
+            }
+        }
+
+        Map<String, String> summary = new LinkedHashMap<>();
+        summary.put("run_id", String.valueOf(liveManifest.getOrDefault("run_id", "")));
+        summary.put("run_number", Integer.toString(runNumberFromRunId(String.valueOf(liveManifest.getOrDefault("run_id", "")))));
+        summary.put("started_at", String.valueOf(liveManifest.getOrDefault("started_at", "")));
+        summary.put("profile_id", String.valueOf(liveManifest.getOrDefault("profile_id", "")));
+        summary.put("profile_name", String.valueOf(liveManifest.getOrDefault("profile_name", "")));
+        summary.put("host_os", hostOs);
+        summary.put("host_arch", hostArch);
+        summary.put("status", status);
+        summary.put("result_count", Integer.toString((int) liveRunRows.stream().filter(row -> !"true".equals(row.getOrDefault("warmup", "false"))).count()));
+        summary.put("implementation_count", Integer.toString((int) implementations.stream().filter(value -> !value.isBlank()).count()));
+        summary.put("case_count", Integer.toString((int) cases.stream().filter(value -> !value.isBlank()).count()));
+        summary.put("best_metric_value", best == null ? "" : String.format("%.6f", best.value()));
+        summary.put("best_metric_kind", best == null ? "" : best.kind());
+        return summary;
+    }
+
+    private Map<String, String> resultRowFromEvent(Map<String, String> event) {
+        Map<String, String> row = new LinkedHashMap<>();
+        for (String header : RESULT_HEADERS) {
+            row.put(header, event.getOrDefault(header, ""));
+        }
+        return row;
+    }
+
+    private void appendLiveLog(StringBuilder output, Map<String, String> event) {
         StringBuilder builder = new StringBuilder();
         builder.append('[').append(event.getOrDefault("phase", "")).append("] ").append(event.getOrDefault("message", ""));
         if (!event.getOrDefault("implementation", "").isBlank()) {
@@ -1040,8 +1457,7 @@ public final class ShellFrame {
         if (!event.getOrDefault("metric", "").isBlank()) {
             builder.append(" | ").append(event.get("metric")).append(' ').append(event.getOrDefault("metric_kind", ""));
         }
-        liveLogArea.append(builder.append('\n').toString());
-        liveLogArea.setCaretPosition(liveLogArea.getDocument().getLength());
+        output.append(builder).append('\n');
     }
 
     private String monitorTailText(Map<String, String> event) {
@@ -1058,13 +1474,6 @@ public final class ShellFrame {
         int progress = (int) Math.round((stepIndex * 100.0) / stepTotal);
         statusBar.progressBar().setValue(progress);
         statusBar.progressBar().setString(stepIndex + " / " + stepTotal);
-    }
-
-    private void pushLiveEventTable(Map<String, String> event) {
-        List<Map<String, String>> rows = new ArrayList<>(state.runEvents().asMaps());
-        rows.add(event);
-        state.setRunEvents(mapsToTableData(rows, LIVE_EVENT_HEADERS));
-        applyTable(eventsTable, eventsModel, state.runEvents());
     }
 
     private void inspectSelectedRunResult(boolean openTab) {
@@ -1129,6 +1538,10 @@ public final class ShellFrame {
             manifestArea.setText("");
             return;
         }
+        if (Objects.equals(runId, state.liveRunId()) && !liveManifest.isEmpty()) {
+            manifestArea.setText(formatLiveManifest(liveManifest));
+            return;
+        }
         if (Objects.equals(runId, state.currentRunId()) && !state.runManifest().rows().isEmpty()) {
             manifestArea.setText(formatKeyValueTable(state.runManifest()));
             return;
@@ -1151,11 +1564,23 @@ public final class ShellFrame {
     }
 
     private void openRunOverviewTab() {
-        openScreen("run", "Run Overview", IconFactory.chartIcon(14, UiPalette.TEXT), buildRunOverviewScreen(), true);
+        openScreen(RUN_OVERVIEW_KEY, "Run Overview", IconFactory.chartIcon(14, UiPalette.TEXT), buildRunOverviewScreen(), true);
     }
 
     private void openArtifactsTab() {
-        openScreen("artifacts", "Artifacts", IconFactory.docsIcon(14, UiPalette.TEXT), buildArtifactsScreen(), true);
+        openScreen(ARTIFACTS_KEY, "Artifacts", IconFactory.docsIcon(14, UiPalette.TEXT), buildArtifactsScreen(), true);
+    }
+
+    private void openGlobalOverviewScreen() {
+        openScreen(GLOBAL_KEY, "Global Overview", IconFactory.chartIcon(14, UiPalette.TEXT), buildGlobalOverviewScreen(), true);
+    }
+
+    private void openLiveMonitorTab() {
+        openScreen(MONITOR_KEY, "Live Monitor", IconFactory.radarIcon(14, UiPalette.TEXT), buildLiveMonitorScreen(), true);
+    }
+
+    private void openBuilderTab() {
+        openScreen(BUILDER_KEY, "Run Config", IconFactory.docsIcon(14, UiPalette.TEXT), profileBuilderPanel, true);
     }
 
     private void openDocumentTab(String title, Path relativePath) {
@@ -1207,14 +1632,6 @@ public final class ShellFrame {
         activityBar.setSelected(activity);
         sidePanel.setCollapsed(false);
         sidePanel.showPanel(activity);
-        switch (activity) {
-            case RUNS -> workspaceTabs.setSelectedComponent(tabsByKey.get("global"));
-            case ANALYSIS -> workspaceTabs.setSelectedComponent(tabsByKey.get("global"));
-            case MONITOR -> workspaceTabs.setSelectedComponent(tabsByKey.get("monitor"));
-            case ARTIFACTS -> openArtifactsTab();
-            case CONFIG -> workspaceTabs.setSelectedComponent(tabsByKey.get("builder"));
-            case DOCS -> openDocumentTab("README", Path.of("README.md"));
-        }
     }
 
     private void clearRunWorkspace() {
@@ -1237,12 +1654,12 @@ public final class ShellFrame {
 
     private void configureTable(JTable table) {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        table.setRowHeight(28);
+        table.setRowHeight(26);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getTableHeader().setReorderingAllowed(false);
-        table.setShowVerticalLines(true);
+        table.setShowVerticalLines(false);
         table.setShowHorizontalLines(true);
-        table.setIntercellSpacing(new Dimension(1, 1));
+        table.setIntercellSpacing(new Dimension(0, 1));
         table.setSelectionBackground(UiPalette.ACCENT);
         table.setSelectionForeground(UiPalette.WINDOW);
         table.setBackground(UiPalette.SURFACE);
@@ -1272,14 +1689,14 @@ public final class ShellFrame {
         configureTable(table);
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.getViewport().setBackground(UiPalette.SURFACE);
-        scrollPane.setBorder(DarkTheme.panelBorder());
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         return scrollPane;
     }
 
     private JScrollPane textScroll(JTextArea area) {
         JScrollPane scrollPane = new JScrollPane(area);
         scrollPane.getViewport().setBackground(UiPalette.SURFACE);
-        scrollPane.setBorder(DarkTheme.panelBorder());
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         return scrollPane;
     }
 
@@ -1289,11 +1706,11 @@ public final class ShellFrame {
         if (size != null) {
             scroll.setPreferredSize(size);
         }
-        scroll.setBorder(BorderFactory.createLineBorder(UiPalette.BORDER, 1, true));
+        scroll.setBorder(BorderFactory.createEmptyBorder());
 
         JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
         panel.setBackground(UiPalette.PANEL);
-        panel.setBorder(DarkTheme.panelBorder());
+        panel.setBorder(moduleBorder());
         JLabel title = label(titleText);
         title.setFont(UiPalette.LABEL.deriveFont(13f));
         panel.add(title, BorderLayout.NORTH);
@@ -1304,7 +1721,7 @@ public final class ShellFrame {
     private JPanel sideCard(String title) {
         JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_MD));
         panel.setBackground(UiPalette.PANEL);
-        panel.setBorder(DarkTheme.panelBorder());
+        panel.setBorder(moduleBorder());
         panel.add(label(title), BorderLayout.NORTH);
         return panel;
     }
@@ -1354,6 +1771,7 @@ public final class ShellFrame {
         button.setBackground(background);
         button.setForeground(pickForeground(background));
         button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
         return button;
     }
 
@@ -1367,6 +1785,135 @@ public final class ShellFrame {
         label.setForeground(UiPalette.MUTED);
         label.setFont(UiPalette.LABEL);
         return label;
+    }
+
+    private static javax.swing.border.Border moduleBorder() {
+        return BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(UiPalette.BORDER, 1),
+            BorderFactory.createEmptyBorder(UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD)
+        );
+    }
+
+    private void updateHomeOverview() {
+        StringBuilder runsBuilder = new StringBuilder();
+        int shown = 0;
+        for (Map<String, String> row : sortedRuns(state.displayedRuns().asMaps())) {
+            runsBuilder.append(row.getOrDefault("run_id", ""))
+                .append(" · ")
+                .append(row.getOrDefault("profile_id", ""))
+                .append(" · ")
+                .append(row.getOrDefault("status", ""))
+                .append('\n');
+            String metric = row.getOrDefault("best_metric_value", "");
+            if (!metric.isBlank()) {
+                runsBuilder.append("  best: ").append(metric).append(' ').append(row.getOrDefault("best_metric_kind", "")).append('\n');
+            }
+            runsBuilder.append('\n');
+            shown += 1;
+            if (shown >= 6) {
+                break;
+            }
+        }
+        homeRecentRunsArea.setText(runsBuilder.length() == 0 ? "No tracked runs yet." : runsBuilder.toString().stripTrailing());
+
+        int builtinProfiles = 0;
+        int customProfiles = 0;
+        StringBuilder profilesBuilder = new StringBuilder();
+        for (Map<String, String> row : state.profiles().asMaps()) {
+            if (Objects.equals("custom", row.getOrDefault("source", ""))) {
+                customProfiles += 1;
+            } else {
+                builtinProfiles += 1;
+            }
+            profilesBuilder.append(row.getOrDefault("profile_id", ""))
+                .append(" · ")
+                .append(row.getOrDefault("source", ""))
+                .append('\n');
+        }
+        profilesBuilder.append('\n')
+            .append("Built-in: ").append(builtinProfiles).append('\n')
+            .append("Custom: ").append(customProfiles);
+        homeProfilesArea.setText(profilesBuilder.toString().stripTrailing());
+
+        MetricSample best = bestMetric(state.displayedGlobalResults().asMaps());
+        if (best == null) {
+            homeBestArea.setText("No measured data yet.");
+        } else {
+            homeBestArea.setText(
+                best.row().getOrDefault("implementation", "") + " · " + best.row().getOrDefault("case_id", "") + '\n'
+                    + String.format("%.6f %s", best.value(), best.kind()) + '\n'
+                    + best.row().getOrDefault("run_id", "")
+            );
+        }
+    }
+
+    private boolean hasDisplayedRun(String runId) {
+        return !findRow(state.displayedRuns().asMaps(), "run_id", runId).isEmpty();
+    }
+
+    private void deleteSelectedRun() {
+        String runId = state.currentRunId();
+        if (runId.isBlank()) {
+            return;
+        }
+        if (activeProcess != null && Objects.equals(runId, state.liveRunId())) {
+            JOptionPane.showMessageDialog(frame, "Stop the active run before deleting it.", "Run Active", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(frame, "Delete tracked run " + runId + "?", "Delete Run", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            backend.deleteRun(runId);
+            if (Objects.equals(state.currentRunId(), runId)) {
+                state.setCurrentRunId("");
+                clearRunWorkspace();
+                workspaceTabs.setSelectedComponent(tabsByKey.get(HOME_KEY));
+            }
+            refreshAll(true);
+        } catch (Exception error) {
+            JOptionPane.showMessageDialog(frame, "Unable to delete run.\n" + error.getMessage(), "Delete Failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void deleteSelectedCustomProfile() {
+        String profileId = String.valueOf(statusBar.profileSelector().getSelectedItem());
+        if (profileId == null || profileId.isBlank()) {
+            return;
+        }
+        Map<String, String> profileRow = findRow(state.profiles().asMaps(), "profile_id", profileId);
+        if (!Objects.equals("custom", profileRow.getOrDefault("source", ""))) {
+            JOptionPane.showMessageDialog(frame, "Built-in profiles stay read-only.", "Read-Only Profile", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(frame, "Delete custom profile " + profileId + "?", "Delete Profile", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            backend.deleteCustomProfile(profileId);
+            refreshAll(true);
+        } catch (Exception error) {
+            JOptionPane.showMessageDialog(frame, "Unable to delete custom profile.\n" + error.getMessage(), "Delete Failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private static String formatLiveManifest(Map<String, Object> manifest) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : manifest.entrySet()) {
+            builder.append(entry.getKey()).append(": ").append(entry.getValue()).append('\n');
+        }
+        return builder.toString().stripTrailing();
+    }
+
+    private static int runNumberFromRunId(String runId) {
+        if (runId == null || !runId.startsWith("run")) {
+            return 0;
+        }
+        int underscore = runId.indexOf('_');
+        String number = underscore >= 0 ? runId.substring(3, underscore) : runId.substring(3);
+        return parseInt(number);
     }
 
     private JTextArea buildTextArea() {
@@ -1410,6 +1957,75 @@ public final class ShellFrame {
                 return;
             }
         }
+    }
+
+    private static List<Map<String, String>> sortedRuns(List<Map<String, String>> rows) {
+        List<Map<String, String>> ordered = new ArrayList<>(rows);
+        ordered.sort((left, right) -> {
+            int byNumber = Integer.compare(parseInt(right.get("run_number")), parseInt(left.get("run_number")));
+            if (byNumber != 0) {
+                return byNumber;
+            }
+            return right.getOrDefault("run_id", "").compareTo(left.getOrDefault("run_id", ""));
+        });
+        return ordered;
+    }
+
+    private static boolean restoreSelectionByKey(JTable table, DefaultTableModel model, String columnName, String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        int column = model.findColumn(columnName);
+        if (column < 0) {
+            return false;
+        }
+        for (int row = 0; row < model.getRowCount(); row += 1) {
+            if (Objects.equals(value, String.valueOf(model.getValueAt(row, column)))) {
+                table.setRowSelectionInterval(row, row);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String selectedCompositeKey(JTable table, DefaultTableModel model, List<String> columns) {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            return "";
+        }
+        int modelRow = table.convertRowIndexToModel(row);
+        Map<String, String> values = new LinkedHashMap<>();
+        for (String column : columns) {
+            int columnIndex = model.findColumn(column);
+            values.put(column, columnIndex >= 0 ? String.valueOf(model.getValueAt(modelRow, columnIndex)) : "");
+        }
+        return compositeKey(values, columns);
+    }
+
+    private static boolean restoreSelectionByCompositeKey(JTable table, DefaultTableModel model, List<String> columns, String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        for (int row = 0; row < model.getRowCount(); row += 1) {
+            Map<String, String> values = new LinkedHashMap<>();
+            for (String column : columns) {
+                int columnIndex = model.findColumn(column);
+                values.put(column, columnIndex >= 0 ? String.valueOf(model.getValueAt(row, columnIndex)) : "");
+            }
+            if (Objects.equals(key, compositeKey(values, columns))) {
+                table.setRowSelectionInterval(row, row);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String compositeKey(Map<String, String> values, List<String> columns) {
+        StringBuilder builder = new StringBuilder();
+        for (String column : columns) {
+            builder.append(values.getOrDefault(column, "")).append('\u001f');
+        }
+        return builder.toString();
     }
 
     private static void applyTable(JTable table, DefaultTableModel model, TableData data) {

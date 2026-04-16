@@ -81,6 +81,14 @@ public final class BackendClient {
         return builder.start();
     }
 
+    public void deleteRun(String runId) throws IOException, InterruptedException {
+        readTable("delete-run", runId);
+    }
+
+    public void deleteCustomProfile(String profileId) throws IOException, InterruptedException {
+        readTable("delete-custom-profile", profileId);
+    }
+
     private List<String> command(String... args) {
         List<String> command = new ArrayList<>();
         command.add(pythonExe);

@@ -6,7 +6,6 @@ import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 
-import cpubench.ui.DarkTheme;
 import cpubench.ui.UiPalette;
 import cpubench.ui.shell.ActivityBar.Activity;
 
@@ -18,8 +17,11 @@ public final class SidePanel extends JPanel {
         super();
         setLayout(cards);
         setBackground(UiPalette.PANEL);
-        setBorder(BorderFactory.createCompoundBorder(DarkTheme.panelBorder(), BorderFactory.createEmptyBorder(0, 0, 0, 0)));
-        setPreferredSize(new Dimension(300, 0));
+        setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(UiPalette.BORDER, 1),
+            BorderFactory.createEmptyBorder(UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD, UiPalette.GAP_MD)
+        ));
+        setPreferredSize(new Dimension(292, 0));
     }
 
     public void addPanel(Activity activity, JComponent component) {

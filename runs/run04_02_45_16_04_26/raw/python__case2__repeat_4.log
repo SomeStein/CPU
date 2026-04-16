@@ -1,7 +1,0 @@
-[command]
-/Library/Frameworks/Python.framework/Versions/3.11/bin/python3 /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python/python.py --case-file /Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/runs/run04_02_45_16_04_26/cases/python__case2__repeat_4.case
-
-[stdout]
-{"applied_affinity_mode": "advisory_macos", "applied_priority_mode": "advisory_macos", "case_id": "case2", "elapsed_ns": 29500, "host_arch": "arm64", "host_os": "macos", "implementation": "python", "iterations": 10, "language": "python", "loop_trip_count": 0, "ns_per_add": 1475.0, "ns_per_iteration": 2950.0, "parallel_chains": 16, "pid": 26096, "platform_extras": {}, "remainder": 10, "repeat_index": 4, "requested_affinity_mode": "single_core", "requested_priority_mode": "high", "result_checksum": "290862", "runtime_name": "python3", "scheduler_notes": "priority elevation unavailable; macos: affinity advisory (apple silicon does not honor pinning); QoS set to user_interactive", "schema_version": 1, "tid": 21150270, "timer_kind": "perf_counter_ns", "variant": "default", "warmup": false}
-
-[stderr]

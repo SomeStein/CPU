@@ -11,7 +11,10 @@ public final class LanguageListCellRenderer extends DefaultListCellRenderer {
         String implementationId = String.valueOf(value);
         if (!implementationId.isBlank() && !"All".equals(implementationId)) {
             setIcon(LanguageIconRegistry.icon(implementationId, 16));
-            setText(" " + LanguageIconRegistry.displayName(implementationId));
+            setText(" ");
+            setToolTipText(LanguageIconRegistry.displayName(implementationId));
+        } else {
+            setToolTipText(null);
         }
         return this;
     }

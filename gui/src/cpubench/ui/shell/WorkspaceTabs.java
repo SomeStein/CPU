@@ -61,7 +61,7 @@ public final class WorkspaceTabs extends JTabbedPane {
         private final boolean closable;
 
         TabHeader(JTabbedPane tabs, String title, boolean closable) {
-            super(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            super(new FlowLayout(FlowLayout.LEFT, 4, 0));
             this.closable = closable;
             setOpaque(false);
             setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
@@ -71,7 +71,7 @@ public final class WorkspaceTabs extends JTabbedPane {
             if (closable) {
                 JButton close = new JButton("×");
                 close.setFocusable(false);
-                close.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
+                close.setBorder(BorderFactory.createEmptyBorder(0, 1, 0, 1));
                 close.setContentAreaFilled(false);
                 close.setForeground(UiPalette.MUTED);
                 close.addActionListener(event -> {
