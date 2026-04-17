@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "node",
+  "host": "macos-arm64",
+  "version": "22.15.0",
+  "url": "https://nodejs.org/download/release/v22.15.0/node-v22.15.0-darwin-arm64.tar.xz",
+  "sha256": "",
+  "archive_type": "tar.xz",
+  "destination": "tools/runtime/macos-arm64/node",
+  "executables": ["bin/node"],
+  "license_files": ["LICENSE"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": false,
+  "archive_subdir": "node-v22.15.0-darwin-arm64",
+  "install_hint": "macOS Node bootstrap is specified here but still needs host-side validation."
+}

@@ -44,7 +44,6 @@ import cpubench.model.ProfileCaseDraft;
 import cpubench.model.ProfileDraft;
 import cpubench.model.ProfileOverrideDraft;
 import cpubench.model.TableData;
-import cpubench.ui.icons.LanguageIconRegistry;
 
 public final class ProfileBuilderPanel extends JPanel {
     private final BackendClient backend;
@@ -309,7 +308,11 @@ public final class ProfileBuilderPanel extends JPanel {
             box.setOpaque(false);
             box.setForeground(UiPalette.TEXT);
             box.setToolTipText(entry.description());
-            box.setIcon(LanguageIconRegistry.icon(entry.implementationId(), 16));
+            box.setIcon(IconFactory.checklistLanguageIcon(entry.implementationId(), 16, false));
+            box.setSelectedIcon(IconFactory.checklistLanguageIcon(entry.implementationId(), 16, true));
+            box.setDisabledIcon(box.getIcon());
+            box.setDisabledSelectedIcon(box.getSelectedIcon());
+            box.setIconTextGap(10);
             box.addActionListener(event -> {
                 if (!applyingDraft) {
                     renderImplementationSummary();

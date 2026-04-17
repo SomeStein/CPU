@@ -180,6 +180,7 @@ public final class ShellFrame {
     private final JTextArea homeRecentRunsArea = buildTextArea();
     private final JTextArea homeProfilesArea = buildTextArea();
     private final JTextArea homeBestArea = buildTextArea();
+    private final JTextArea homeStartupArea = buildTextArea();
     private final JComponent homeBackground = buildHomeScreen();
 
     private final JPanel runImplementationFilterPanel = checklistPanel();
@@ -229,6 +230,9 @@ public final class ShellFrame {
     private final List<Map<String, String>> liveRunRows = new ArrayList<>();
     private final List<Map<String, String>> liveGlobalRows = new ArrayList<>();
     private final List<Map<String, String>> liveEventRows = new ArrayList<>();
+    private TableData startupReadiness = TableData.empty();
+    private TableData startupSelfCheck = TableData.empty();
+    private String startupDiagnosticsMessage = "Waiting for startup validation.";
     private String liveRunStatus = "running";
 
     public ShellFrame(BackendClient backend) {
@@ -253,6 +257,7 @@ public final class ShellFrame {
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
         idleRefreshTimer.start();
+        runStartupDiagnostics();
     }
 
     private void buildUi() {
@@ -555,6 +560,7 @@ public final class ShellFrame {
 
         JPanel left = new JPanel(new BorderLayout(0, UiPalette.GAP_MD));
         left.setOpaque(false);
+        left.add(textSection("Startup Summary", homeStartupArea, new Dimension(0, 220)), BorderLayout.NORTH);
         left.add(textSection("How To Use", homeGuideArea, null), BorderLayout.CENTER);
         left.add(docsButtons, BorderLayout.SOUTH);
 
@@ -568,6 +574,45 @@ public final class ShellFrame {
         split.setResizeWeight(0.56);
         DarkTheme.styleSplitPane(split);
         return split;
+    }
+
+    private void runStartupDiagnostics() {
+        startupDiagnosticsMessage = "Running readiness validation and ephemeral self-check...";
+        updateStartupOverview();
+        new SwingWorker<Void, Void>() {
+            private TableData loadedReadiness = TableData.empty();
+            private TableData loadedSelfCheck = TableData.empty();
+            private String loadedMessage = "";
+
+            @Override
+            protected Void doInBackground() throws Exception {
+                loadedReadiness = backend.readTable("readiness");
+                if (hasReadyComponent(loadedReadiness, "jdk")) {
+                    loadedSelfCheck = backend.readTable("self-check");
+                    loadedMessage = "Startup validation completed.";
+                } else {
+                    loadedMessage = "Self-check skipped until the bundled JDK is ready.";
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    startupReadiness = loadedReadiness;
+                    startupSelfCheck = loadedSelfCheck;
+                    startupDiagnosticsMessage = loadedMessage;
+                    statusBar.setHealth(startupHealthColor());
+                } catch (Exception error) {
+                    startupReadiness = loadedReadiness;
+                    startupSelfCheck = TableData.empty();
+                    startupDiagnosticsMessage = "Startup validation failed: " + error.getMessage();
+                    statusBar.setHealth(UiPalette.DANGER);
+                }
+                updateStartupOverview();
+            }
+        }.execute();
     }
 
     private JComponent buildGlobalOverviewScreen() {
@@ -1835,6 +1880,7 @@ public final class ShellFrame {
         measuredOnly.setOpaque(false);
         measuredOnly.setForeground(UiPalette.TEXT);
         measuredOnly.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        styleChecklistBox(measuredOnly, null);
         stack.add(measuredOnly);
         panel.add(stack, BorderLayout.CENTER);
         return panel;
@@ -1869,12 +1915,24 @@ public final class ShellFrame {
         checkBox.setFocusPainted(false);
         checkBox.setFont(UiPalette.BODY);
         checkBox.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        styleChecklistBox(checkBox, iconOnly ? value : null);
         if (iconOnly) {
-            checkBox.setIcon(LanguageIconRegistry.icon(value, 16));
-            checkBox.setIconTextGap(8);
             checkBox.setToolTipText(LanguageIconRegistry.displayName(value));
         }
         return checkBox;
+    }
+
+    private void styleChecklistBox(JCheckBox checkBox, String implementationId) {
+        if (implementationId == null || implementationId.isBlank()) {
+            checkBox.setIcon(IconFactory.checklistIcon(16, false));
+            checkBox.setSelectedIcon(IconFactory.checklistIcon(16, true));
+        } else {
+            checkBox.setIcon(IconFactory.checklistLanguageIcon(implementationId, 16, false));
+            checkBox.setSelectedIcon(IconFactory.checklistLanguageIcon(implementationId, 16, true));
+        }
+        checkBox.setDisabledIcon(checkBox.getIcon());
+        checkBox.setDisabledSelectedIcon(checkBox.getSelectedIcon());
+        checkBox.setIconTextGap(10);
     }
 
     private JPanel labelledField(String title, JComponent component) {
@@ -1970,6 +2028,85 @@ public final class ShellFrame {
                     + best.row().getOrDefault("run_id", "")
             );
         }
+        updateStartupOverview();
+    }
+
+    private void updateStartupOverview() {
+        int requiredLaunch = 0;
+        int readyLaunch = 0;
+        int requiredBuild = 0;
+        int readyBuild = 0;
+        int readyImplementations = 0;
+        int buildableImplementations = 0;
+        List<String> missingLaunch = new ArrayList<>();
+
+        for (Map<String, String> row : startupReadiness.asMaps()) {
+            String status = row.getOrDefault("status", "");
+            boolean countsAsReady = Objects.equals("ready", status) || Objects.equals("buildable", status);
+            if (Objects.equals("true", row.getOrDefault("required_for_launch", "false"))) {
+                requiredLaunch += 1;
+                if (countsAsReady) {
+                    readyLaunch += 1;
+                } else {
+                    missingLaunch.add(row.getOrDefault("component_id", ""));
+                }
+            }
+            if (Objects.equals("true", row.getOrDefault("required_for_build", "false"))) {
+                requiredBuild += 1;
+                if (countsAsReady) {
+                    readyBuild += 1;
+                }
+            }
+            if (Objects.equals("implementation", row.getOrDefault("component_kind", ""))) {
+                if (Objects.equals("ready", status)) {
+                    readyImplementations += 1;
+                } else if (Objects.equals("buildable", status)) {
+                    buildableImplementations += 1;
+                }
+            }
+        }
+
+        Map<String, String> overallSelfCheck = findRow(startupSelfCheck.asMaps(), "row_kind", "overall");
+        StringBuilder builder = new StringBuilder();
+        builder.append(startupDiagnosticsMessage).append('\n').append('\n');
+        builder.append("Launch components ready: ").append(readyLaunch).append(" / ").append(requiredLaunch).append('\n');
+        builder.append("Build components ready: ").append(readyBuild).append(" / ").append(requiredBuild).append('\n');
+        builder.append("Implementations ready now: ").append(readyImplementations).append('\n');
+        builder.append("Implementations buildable: ").append(buildableImplementations).append('\n');
+        if (!missingLaunch.isEmpty()) {
+            builder.append('\n').append("Missing launch components: ").append(String.join(", ", missingLaunch)).append('\n');
+        }
+        if (!overallSelfCheck.isEmpty()) {
+            builder.append('\n')
+                .append("Self-check: ").append(overallSelfCheck.getOrDefault("status", "")).append('\n')
+                .append("Ready implementations: ").append(overallSelfCheck.getOrDefault("metric", "0")).append('\n')
+                .append("Artifacts: ").append(overallSelfCheck.getOrDefault("artifact_path", ""));
+        }
+        homeStartupArea.setText(builder.toString().stripTrailing());
+    }
+
+    private boolean hasReadyComponent(TableData table, String componentId) {
+        for (Map<String, String> row : table.asMaps()) {
+            if (Objects.equals(componentId, row.getOrDefault("component_id", ""))
+                && Objects.equals("ready", row.getOrDefault("status", ""))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Color startupHealthColor() {
+        for (Map<String, String> row : startupReadiness.asMaps()) {
+            if (Objects.equals("true", row.getOrDefault("required_for_launch", "false"))
+                && !Objects.equals("ready", row.getOrDefault("status", ""))) {
+                return UiPalette.WARNING;
+            }
+        }
+        Map<String, String> overallSelfCheck = findRow(startupSelfCheck.asMaps(), "row_kind", "overall");
+        if (!overallSelfCheck.isEmpty() && Objects.equals("failed", overallSelfCheck.getOrDefault("status", ""))) {
+            return UiPalette.DANGER;
+        }
+        return UiPalette.SUCCESS;
     }
 
     private boolean hasDisplayedRun(String runId) {

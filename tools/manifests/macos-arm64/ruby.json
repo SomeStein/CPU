@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "ruby",
+  "host": "macos-arm64",
+  "version": "manual",
+  "url": "https://www.ruby-lang.org/en/downloads/",
+  "sha256": "",
+  "archive_type": "tar.gz",
+  "destination": "tools/runtime/macos-arm64/ruby",
+  "executables": ["bin/ruby"],
+  "license_files": ["COPYING"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": false,
+  "install_enabled": false,
+  "install_hint": "macOS Ruby still needs a portable repo-local distribution before it can join automated bootstrap."
+}

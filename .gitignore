@@ -1,4 +1,11 @@
 build/
+dist/
 **/__pycache__/
 *.py[cod]
 .DS_Store
+tools/downloads/
+tools/installed-state.json
+tools/runtime/windows-x64/
+tools/runtime/macos-arm64/
+tools/toolchains/
+tools/bin/windows-x64/*.exe

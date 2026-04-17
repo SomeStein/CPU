@@ -14,6 +14,8 @@ import java.awt.image.BufferedImage;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import cpubench.ui.icons.LanguageIconRegistry;
+
 public final class IconFactory {
     private interface Painter {
         void paint(Graphics2D graphics, int size, Color color);
@@ -55,6 +57,14 @@ public final class IconFactory {
 
     public static Icon radarIcon(int size, Color color) {
         return icon(size, color, IconFactory::paintRadar);
+    }
+
+    public static Icon checklistIcon(int size, boolean selected) {
+        return new ChecklistIcon(size, selected, null);
+    }
+
+    public static Icon checklistLanguageIcon(String implementationId, int size, boolean selected) {
+        return new ChecklistIcon(size, selected, LanguageIconRegistry.icon(implementationId, size));
     }
 
     private static Icon icon(int size, Color color, Painter painter) {
@@ -136,6 +146,62 @@ public final class IconFactory {
         graphics.draw(new Arc2D.Double(size * 0.30, size * 0.30, size * 0.40, size * 0.40, 30, 300, Arc2D.OPEN));
         graphics.draw(new Line2D.Double(size * 0.50, size * 0.50, size * 0.78, size * 0.22));
         graphics.fill(new Arc2D.Double(size * 0.70, size * 0.14, size * 0.16, size * 0.16, 0, 360, Arc2D.CHORD));
+    }
+
+    private static final class ChecklistIcon implements Icon {
+        private final int size;
+        private final boolean selected;
+        private final Icon languageIcon;
+
+        private ChecklistIcon(int size, boolean selected, Icon languageIcon) {
+            this.size = size;
+            this.selected = selected;
+            this.languageIcon = languageIcon;
+        }
+
+        @Override
+        public void paintIcon(Component component, java.awt.Graphics graphics, int x, int y) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            try {
+                configure(g2);
+                int boxSize = Math.max(12, size);
+                int boxY = y + Math.max(0, (getIconHeight() - boxSize) / 2);
+                Shape box = new RoundRectangle2D.Double(x, boxY, boxSize, boxSize, 6, 6);
+                g2.setColor(selected ? UiPalette.ACCENT : UiPalette.SURFACE_ALT);
+                g2.fill(box);
+                g2.setColor(selected ? UiPalette.ACCENT : UiPalette.BORDER);
+                g2.setStroke(new BasicStroke(1.4f));
+                g2.draw(box);
+                if (selected) {
+                    g2.setColor(UiPalette.WINDOW);
+                    g2.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    GeneralPath check = new GeneralPath();
+                    check.moveTo(x + boxSize * 0.22, boxY + boxSize * 0.54);
+                    check.lineTo(x + boxSize * 0.42, boxY + boxSize * 0.74);
+                    check.lineTo(x + boxSize * 0.78, boxY + boxSize * 0.28);
+                    g2.draw(check);
+                }
+                if (languageIcon != null) {
+                    int iconX = x + boxSize + 8;
+                    int iconY = y + Math.max(0, (getIconHeight() - languageIcon.getIconHeight()) / 2);
+                    languageIcon.paintIcon(component, g2, iconX, iconY);
+                }
+            } finally {
+                g2.dispose();
+            }
+        }
+
+        @Override
+        public int getIconWidth() {
+            int languageWidth = languageIcon == null ? 0 : languageIcon.getIconWidth() + 8;
+            return Math.max(12, size) + languageWidth;
+        }
+
+        @Override
+        public int getIconHeight() {
+            int baseHeight = Math.max(12, size);
+            return languageIcon == null ? baseHeight : Math.max(baseHeight, languageIcon.getIconHeight());
+        }
     }
 }
 

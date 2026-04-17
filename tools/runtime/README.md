@@ -1,6 +1,8 @@
 # Runtime Bundles
 
-`scripts/package.py` expects a fully populated runtime bundle for the current host under `tools/runtime/<host>/`.
+`scripts/controller_api.py prepare-host --download-missing` installs pinned repo-local
+runtimes and toolchains from `tools/manifests/<host>/` into `tools/runtime/<host>/`
+and `tools/toolchains/<host>/`.
 
 Supported hosts:
 
@@ -15,7 +17,11 @@ Expected runtime directories:
 - `tools/runtime/<host>/perl`
 - `tools/runtime/<host>/java`
 - `tools/runtime/<host>/go`
-- `tools/runtime/<host>/rust`
+
+Expected toolchain directories:
+
+- `tools/toolchains/<host>/llvm`
+- `tools/toolchains/<host>/rust`
 
 Expected executables:
 
@@ -28,10 +34,13 @@ Expected executables:
 - `java/bin/jar(.exe)`
 - `java/bin/jpackage(.exe)`
 - `go/bin/go(.exe)`
-- `rust/bin/rustc(.exe)`
+- `../toolchains/<host>/llvm/bin/clang(.exe)`
+- `../toolchains/<host>/llvm/bin/clang++(.exe)`
+- `../toolchains/<host>/rust/cargo/bin/rustc(.exe)`
 
 Bundle checklist:
 
+- Keep pinned manifests in `tools/manifests/<host>/`.
 - Record the exact version chosen for each runtime before producing a distribution build.
 - Keep one pinned version per host/runtime combination inside your release notes.
 - Prebuilt native workers belong in `tools/bin/<host>/`.

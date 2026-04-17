@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "go",
+  "host": "macos-arm64",
+  "version": "1.24.2",
+  "url": "https://go.dev/dl/go1.24.2.darwin-arm64.tar.gz",
+  "sha256": "",
+  "archive_type": "tar.gz",
+  "destination": "tools/runtime/macos-arm64/go",
+  "executables": ["bin/go"],
+  "license_files": ["LICENSE"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "archive_subdir": "go",
+  "install_hint": "macOS Go bootstrap is pinned here and should be validated on a macOS arm64 host."
+}

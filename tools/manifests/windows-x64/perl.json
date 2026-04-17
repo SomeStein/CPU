@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "perl",
+  "host": "windows-x64",
+  "version": "5.40.x",
+  "url": "https://strawberryperl.com/releases.html",
+  "sha256": "",
+  "archive_type": "zip",
+  "destination": "tools/runtime/windows-x64/perl",
+  "executables": ["perl/bin/perl.exe"],
+  "license_files": ["licenses"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": false,
+  "install_enabled": false,
+  "install_hint": "Perl uses a pinned manifest slot, but the portable Strawberry Perl download still needs to be finalized for automated bootstrap."
+}

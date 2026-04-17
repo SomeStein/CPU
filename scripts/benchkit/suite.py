@@ -13,6 +13,7 @@ from typing import Callable
 from .catalog import IMPLEMENTATIONS, ImplementationEntry
 from .build import build_compiled_entry
 from .common import (
+    BUILD_TMP_DIR,
     HOST_ARCH,
     HOST_OS,
     RESULT_FIELD_ORDER,
@@ -34,6 +35,7 @@ from .runtimes import ResolvedTool, resolve_tool
 
 
 EventCallback = Callable[[dict[str, str]], None]
+SELF_CHECK_DIR = BUILD_TMP_DIR / "self-check"
 
 
 if sys.platform == "win32":
@@ -267,6 +269,121 @@ def run_profile_payload(
         return {"run_id": run_id, "status": status}
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def self_check_rows(*, java_output_dir: Path) -> list[dict[str, str]]:
+    timestamp = datetime.now()
+    run_id = f"selfcheck_{timestamp:%Y%m%d_%H%M%S}"
+    session_dir = SELF_CHECK_DIR / run_id
+    cases_dir = session_dir / "cases"
+    raw_dir = session_dir / "raw"
+    cases_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "run_number": 0,
+        "started_at": timestamp.isoformat(timespec="seconds"),
+        "profile": {
+            "id": "self_check",
+            "name": "Self Check",
+        },
+        "host_os": HOST_OS,
+        "host_arch": HOST_ARCH,
+    }
+
+    results: list[dict[str, str]] = []
+    events: list[dict[str, str]] = []
+    artifacts: dict[str, dict[str, object]] = {}
+    rows: list[dict[str, str]] = []
+    ready_entries: list[tuple[ImplementationEntry, ResolvedTool]] = []
+    placeholder_case = ROOT_DIR / "build" / "tmp" / ".preflight.case"
+
+    for implementation_id, entry in IMPLEMENTATIONS.items():
+        runtime = _resolve_runtime(entry)
+        try:
+            _command_for_entry(entry, runtime, placeholder_case, java_output_dir)
+            ready_entries.append((entry, runtime))
+        except Exception as error:
+            rows.append(
+                {
+                    "row_kind": "implementation",
+                    "implementation_id": implementation_id,
+                    "status": "skipped",
+                    "message": str(error),
+                    "runtime_source": runtime.source,
+                    "metric": "",
+                    "metric_kind": "",
+                    "artifact_path": "",
+                }
+            )
+
+    total_steps = len(ready_entries)
+    for index, (entry, runtime) in enumerate(ready_entries, start=1):
+        case_values = {
+            "run_id": run_id,
+            "profile_id": "self_check",
+            "implementation": entry.implementation_id,
+            "case_id": "self_check",
+            "iterations": 4000,
+            "parallel_chains": 1,
+            "priority_mode": "unchanged",
+            "affinity_mode": "unchanged",
+            "timer_mode": "monotonic_ns",
+            "warmup": "false",
+            "repeat_index": 1,
+        }
+        execution_name = f"{entry.implementation_id}__self_check"
+        _execute_case(
+            entry=entry,
+            runtime=runtime,
+            case_values=case_values,
+            execution_name=execution_name,
+            java_output_dir=java_output_dir,
+            cases_dir=cases_dir,
+            raw_dir=raw_dir,
+            manifest=manifest,
+            results=results,
+            events=events,
+            artifacts=artifacts,
+            stream=None,
+            step_index=index,
+            step_total=total_steps,
+        )
+
+    for result in results:
+        rows.append(
+            {
+                "row_kind": "implementation",
+                "implementation_id": result.get("implementation", ""),
+                "status": result.get("status", ""),
+                "message": result.get("error_message", "") or "Ephemeral self-check completed.",
+                "runtime_source": result.get("runtime_source", ""),
+                "metric": result.get("ns_per_iteration", ""),
+                "metric_kind": "ns/iter" if result.get("ns_per_iteration", "") else "",
+                "artifact_path": str((raw_dir / f"{result.get('implementation', '')}__self_check.log").relative_to(ROOT_DIR)).replace("\\", "/"),
+            }
+        )
+
+    overall_status = "success"
+    if any(row["status"] == "failed" for row in rows if row["row_kind"] == "implementation"):
+        overall_status = "failed"
+    elif any(row["status"] == "skipped" for row in rows if row["row_kind"] == "implementation"):
+        overall_status = "partial"
+    rows.append(
+        {
+            "row_kind": "overall",
+            "implementation_id": "",
+            "status": overall_status,
+            "message": "Self-check artifacts are stored under build/tmp/self-check and are never added to tracked runs.",
+            "runtime_source": "",
+            "metric": str(len([row for row in rows if row["row_kind"] == "implementation" and row["status"] == "success"])),
+            "metric_kind": "ready_implementations",
+            "artifact_path": str(session_dir.relative_to(ROOT_DIR)).replace("\\", "/"),
+        }
+    )
+    return rows
 
 
 def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:

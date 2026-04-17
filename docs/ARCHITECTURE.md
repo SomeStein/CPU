@@ -85,7 +85,7 @@ Implemented source groups:
 - C: [`benchmarks/c/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/c>)
 - C++: [`benchmarks/cpp/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/cpp>)
 - Go: [`benchmarks/go/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/go>)
-- Java: [`benchmarks/java/src/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/java/src>)
+- Java: [`benchmarks/java/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/java>)
 - Node: [`benchmarks/node/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/node>)
 - Perl: [`benchmarks/perl/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/perl>)
 - Python: [`benchmarks/python/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/benchmarks/python>)

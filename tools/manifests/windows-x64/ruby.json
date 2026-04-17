@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "ruby",
+  "host": "windows-x64",
+  "version": "3.4.9-1",
+  "url": "https://github.com/oneclick/rubyinstaller2/releases/download/RubyInstaller-3.4.9-1/rubyinstaller-3.4.9-1-x64.exe",
+  "sha256": "",
+  "archive_type": "exe",
+  "destination": "tools/runtime/windows-x64/ruby",
+  "executables": ["bin/ruby.exe"],
+  "license_files": ["LICENSE.txt"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": false,
+  "install_args": ["/verysilent", "/norestart", "/allusers=0", "/dir={destination}"],
+  "install_hint": "RubyInstaller is pinned here but its silent install path has not been validated in this workspace yet."
+}

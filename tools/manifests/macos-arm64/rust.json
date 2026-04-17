@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "rust",
+  "host": "macos-arm64",
+  "version": "manual",
+  "url": "https://static.rust-lang.org/rustup/dist/aarch64-apple-darwin/rustup-init",
+  "sha256": "",
+  "archive_type": "rustup-init",
+  "destination": "tools/toolchains/macos-arm64/rust",
+  "executables": ["cargo/bin/rustc"],
+  "license_files": ["rustup"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "install_enabled": false,
+  "install_hint": "macOS Rust is specified here but left manual until the repo-local bootstrap is validated on an Apple Silicon host."
+}

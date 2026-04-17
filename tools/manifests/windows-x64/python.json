@@ -1,0 +1,15 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "python",
+  "host": "windows-x64",
+  "version": "3.13.13",
+  "url": "https://www.python.org/ftp/python/3.13.13/python-3.13.13-embed-amd64.zip",
+  "sha256": "8766a8775746235e23cf5aee5027ab1060bb981d93110577adcf3508aa0cbd55",
+  "archive_type": "zip",
+  "destination": "tools/runtime/windows-x64/python",
+  "executables": ["python.exe"],
+  "license_files": ["LICENSE.txt"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": false
+}

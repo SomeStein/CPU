@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "go",
+  "host": "windows-x64",
+  "version": "1.24.2",
+  "url": "https://go.dev/dl/go1.24.2.windows-amd64.zip",
+  "sha256": "29c553aabee0743e2ffa3e9fa0cda00ef3b3cc4ff0bc92007f31f80fd69892e1",
+  "archive_type": "zip",
+  "destination": "tools/runtime/windows-x64/go",
+  "executables": ["bin/go.exe"],
+  "license_files": ["LICENSE"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "archive_subdir": "go"
+}

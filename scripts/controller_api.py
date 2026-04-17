@@ -5,7 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-from benchkit.build import build_assets
+from package import build_bundle
+from benchkit.bootstrap import prepare_host, readiness_rows as tool_readiness_rows
+from benchkit.build import build_assets, build_java, implementation_readiness_rows
 from benchkit.common import RESULT_FIELD_ORDER
 from benchkit.catalog import implementation_catalog_rows
 from benchkit.history import delete_run_artifact, load_index_rows, load_raw_text, load_run_events, load_run_manifest, load_run_results, run_summaries
@@ -19,7 +21,7 @@ from benchkit.profiles import (
     save_custom_profile,
     validation_rows,
 )
-from benchkit.suite import run_profile, run_profile_path
+from benchkit.suite import run_profile, run_profile_path, self_check_rows
 
 
 def print_tsv(rows: list[dict[str, str]]) -> None:
@@ -64,6 +66,66 @@ def command_profile_json_id(args: argparse.Namespace) -> int:
 def command_implementation_catalog(_: argparse.Namespace) -> int:
     print_tsv(implementation_catalog_rows())
     return 0
+
+
+def command_prepare_host(args: argparse.Namespace) -> int:
+    prepare_host(download_missing=args.download_missing)
+    print_tsv(tool_readiness_rows())
+    return 0
+
+
+def command_readiness(_: argparse.Namespace) -> int:
+    print_tsv([*tool_readiness_rows(), *implementation_readiness_rows()])
+    return 0
+
+
+def command_self_check(_: argparse.Namespace) -> int:
+    try:
+        java_output_dir = build_java()
+        print_tsv(self_check_rows(java_output_dir=java_output_dir))
+        return 0
+    except Exception as error:
+        print_tsv(
+            [
+                {
+                    "row_kind": "overall",
+                    "implementation_id": "",
+                    "status": "failed",
+                    "message": str(error),
+                    "runtime_source": "",
+                    "metric": "0",
+                    "metric_kind": "ready_implementations",
+                    "artifact_path": "build/tmp/self-check",
+                }
+            ]
+        )
+        return 1
+
+
+def command_package_portable(_: argparse.Namespace) -> int:
+    try:
+        build_bundle("app-image")
+        print_tsv(
+            [
+                {
+                    "status": "ok",
+                    "artifact": "portable-app-image",
+                    "message": "Portable CPU Lab app image built into dist/.",
+                }
+            ]
+        )
+        return 0
+    except Exception as error:
+        print_tsv(
+            [
+                {
+                    "status": "failed",
+                    "artifact": "portable-app-image",
+                    "message": str(error),
+                }
+            ]
+        )
+        return 1
 
 
 def command_validate_profile_file(args: argparse.Namespace) -> int:
@@ -266,6 +328,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     implementation_catalog = subparsers.add_parser("implementation-catalog")
     implementation_catalog.set_defaults(handler=command_implementation_catalog)
+
+    prepare_host_cmd = subparsers.add_parser("prepare-host")
+    prepare_host_cmd.add_argument("--download-missing", action="store_true")
+    prepare_host_cmd.set_defaults(handler=command_prepare_host)
+
+    readiness = subparsers.add_parser("readiness")
+    readiness.set_defaults(handler=command_readiness)
+
+    self_check = subparsers.add_parser("self-check")
+    self_check.set_defaults(handler=command_self_check)
+
+    package_portable = subparsers.add_parser("package-portable")
+    package_portable.set_defaults(handler=command_package_portable)
 
     validate_profile = subparsers.add_parser("validate-profile-file")
     validate_profile.add_argument("path")

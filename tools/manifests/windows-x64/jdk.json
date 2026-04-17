@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "jdk",
+  "host": "windows-x64",
+  "version": "21.0.7+6",
+  "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.7%2B6/OpenJDK21U-jdk_x64_windows_hotspot_21.0.7_6.zip",
+  "sha256": "38f4b9fa0b36def9812f6576fd45f6224630477db8c4e669ee78eaa35abb9195",
+  "archive_type": "zip",
+  "destination": "tools/runtime/windows-x64/java",
+  "executables": ["bin/java.exe", "bin/javac.exe", "bin/jar.exe", "bin/jpackage.exe"],
+  "license_files": ["legal"],
+  "component_kind": "runtime",
+  "required_for_launch": true,
+  "required_for_build": true,
+  "archive_subdir": "jdk-21.0.7+6"
+}

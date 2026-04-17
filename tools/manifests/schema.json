@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CPU Lab Tool Manifest",
+  "type": "object",
+  "required": [
+    "tool_id",
+    "host",
+    "version",
+    "url",
+    "sha256",
+    "archive_type",
+    "destination",
+    "executables",
+    "license_files"
+  ],
+  "properties": {
+    "tool_id": {"type": "string"},
+    "host": {"type": "string"},
+    "version": {"type": "string"},
+    "url": {"type": "string"},
+    "sha256": {"type": "string"},
+    "archive_type": {"type": "string"},
+    "destination": {"type": "string"},
+    "executables": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "license_files": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "component_kind": {"type": "string"},
+    "required_for_launch": {"type": "boolean"},
+    "required_for_build": {"type": "boolean"},
+    "archive_subdir": {"type": "string"},
+    "install_args": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "install_env": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "install_enabled": {"type": "boolean"},
+    "install_hint": {"type": "string"}
+  },
+  "additionalProperties": true
+}

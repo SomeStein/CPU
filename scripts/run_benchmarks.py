@@ -6,5 +6,5 @@ from launcher import main
 
 
 if __name__ == "__main__":
-    sys.argv = [sys.argv[0], "run", "--profile", "balanced", *sys.argv[1:]]
+    sys.argv = [sys.argv[0], "analyze", *sys.argv[1:]]
     raise SystemExit(main())

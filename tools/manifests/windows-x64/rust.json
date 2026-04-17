@@ -1,0 +1,18 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "rust",
+  "host": "windows-x64",
+  "version": "rustup-stable",
+  "url": "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe",
+  "sha256": "",
+  "archive_type": "rustup-init",
+  "destination": "tools/toolchains/windows-x64/rust",
+  "executables": ["cargo/bin/rustc.exe"],
+  "license_files": ["rustup"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "install_args": ["-y", "--no-modify-path", "--profile", "minimal", "--default-toolchain", "stable-x86_64-pc-windows-msvc"],
+  "install_enabled": false,
+  "install_hint": "Rust bootstrap is staged, but the Windows linker prerequisites still need to be pinned before it can become fully automated."
+}

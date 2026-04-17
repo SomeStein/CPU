@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: open analyze summary package-macos-arm64 package-windows-x64
+.PHONY: open analyze summary prepare-host readiness self-check package-portable
 
 open:
 	./scripts/run-task.sh analyze
@@ -10,8 +10,14 @@ analyze: open
 summary:
 	$(PYTHON) scripts/launcher.py summary
 
-package-macos-arm64:
-	$(PYTHON) scripts/package.py --type dmg
+prepare-host:
+	$(PYTHON) scripts/controller_api.py prepare-host --download-missing
 
-package-windows-x64:
-	$(PYTHON) scripts/package.py --type msi
+readiness:
+	$(PYTHON) scripts/controller_api.py readiness
+
+self-check:
+	$(PYTHON) scripts/controller_api.py self-check
+
+package-portable:
+	$(PYTHON) scripts/controller_api.py package-portable

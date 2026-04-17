@@ -61,6 +61,10 @@ VS Code tasks are wired through [`scripts/run-task.sh`](/Users/aaronpumm/Desktop
 Primary entrypoints:
 
 ```bash
+python3 scripts/controller_api.py prepare-host --download-missing
+python3 scripts/controller_api.py readiness
+python3 scripts/controller_api.py self-check
+python3 scripts/controller_api.py package-portable
 python3 scripts/launcher.py analyze
 python3 scripts/launcher.py summary
 python3 scripts/analyze_runs.py
@@ -124,11 +128,12 @@ Global tracked history starts in:
 
 ## Runtime Bundles
 
-The launcher prefers repo-local runtimes first and falls back to system tools when bundles are not present. `scripts/package.py` builds host-native bundles from the same layout.
+Pinned runtime and toolchain manifests now live under [`tools/manifests/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/manifests>). `prepare-host` installs repo-local dependencies from those manifests before packaging or launch validation.
 
 Bundle layout:
 
 - runtimes: [`tools/runtime/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/runtime>)
+- toolchains: [`tools/toolchains/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/toolchains>)
 - native binaries: [`tools/bin/`](</Users/aaronpumm/Desktop/Projekte Lokal/GitHub/Testing/CPU/tools/bin>)
 
 The compiled language pack is designed around checked-in host binaries, but the backend can also compile host-native assets when a local toolchain is available.

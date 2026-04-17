@@ -5,6 +5,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from benchkit.bootstrap import prepare_host
 from benchkit.build import build_compiled_entry, build_java
 from benchkit.catalog import IMPLEMENTATIONS
 from benchkit.common import BUILD_DIR, HOST_KEY, HOST_OS, ROOT_DIR, TOOLS_DIR, ensure_supported_host
@@ -19,8 +20,8 @@ JAVA_WORKER_JAR = TOOLS_DIR / "jars" / "java-worker.jar"
 RUNTIME_CHECKS = [
     ("python", "python/python.exe or python/bin/python3"),
     ("node", "node/node.exe or node/bin/node"),
-    ("ruby", "ruby/ruby.exe or ruby/bin/ruby"),
-    ("perl", "perl/perl.exe or perl/bin/perl"),
+    ("ruby", "ruby/ruby.exe or ruby/bin/ruby(.exe)"),
+    ("perl", "perl/perl.exe or perl/bin/perl(.exe)"),
     ("java", "java/bin/java(.exe)"),
 ]
 CONTROLLER_CONTENT = [
@@ -50,7 +51,7 @@ def ensure_runtimes() -> None:
         raise FileNotFoundError(
             "Bundled runtimes are missing for packaging:\n"
             + "\n".join(f"- {entry}" for entry in missing)
-            + "\n\nPopulate tools/runtime/README.md before building a bundle."
+            + "\n\nRun `python scripts/controller_api.py prepare-host --download-missing` to populate the repo-local bundles first."
         )
 
 
@@ -121,10 +122,6 @@ def stage_controller_tree() -> None:
     CONTROLLER_STAGE_DIR.joinpath("build", "tmp").mkdir(parents=True, exist_ok=True)
 
 
-def package_type_from_host() -> str:
-    return "dmg" if HOST_OS == "macos" else "msi"
-
-
 def maybe_icon_arg() -> list[str]:
     resources_dir = ROOT_DIR / "gui" / "resources"
     icon_name = "app.icns" if HOST_OS == "macos" else "app.ico"
@@ -158,6 +155,7 @@ def run_jpackage(package_type: str) -> None:
 
 def build_bundle(package_type: str) -> None:
     ensure_supported_host()
+    prepare_host(download_missing=False)
     ensure_runtimes()
     if PACKAGE_INPUT_DIR.exists():
         shutil.rmtree(PACKAGE_INPUT_DIR)
@@ -171,12 +169,12 @@ def build_bundle(package_type: str) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a host-native CPU Lab bundle with jpackage.")
+    parser = argparse.ArgumentParser(description="Build a portable host-native CPU Lab app image.")
     parser.add_argument(
         "--type",
-        default=package_type_from_host(),
-        choices=["app-image", "dmg", "msi"],
-        help="Installer or bundle type to build on the current host.",
+        default="app-image",
+        choices=["app-image"],
+        help="Portable bundle type to build on the current host.",
     )
     return parser.parse_args()
 

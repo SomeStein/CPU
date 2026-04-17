@@ -7,13 +7,15 @@ from pathlib import Path
 
 from .catalog import IMPLEMENTATIONS, ImplementationEntry
 from .common import (
-    BENCHMARK_JAVA_SRC_DIR,
+    BENCHMARK_JAVA_SOURCE_ROOTS,
     BUILD_DIR,
     GUI_SRC_DIR,
+    HOST_KEY,
     HOST_OS,
     ROOT_DIR,
     SCRIPTS_DIR,
     ensure_supported_host,
+    implementation_metadata,
 )
 from .runtimes import resolve_tool
 
@@ -26,7 +28,8 @@ def _run(command: list[str], *, quiet: bool = False, extra_env: dict[str, str] |
 def _macos_sdk_flags() -> list[str]:
     if HOST_OS != "macos":
         return []
-    xcrun = shutil.which("xcrun")
+    xcrun_tool = resolve_tool("xcrun", required=False, allow_system=True)
+    xcrun = None if xcrun_tool.source == "missing" else str(xcrun_tool.path)
     if not xcrun:
         return []
     try:
@@ -50,25 +53,37 @@ def _macos_cpp_flags() -> list[str]:
     return [*flags, *extra]
 
 
-def _find_compiler(candidates: list[str]) -> str | None:
-    for candidate in candidates:
-        path = shutil.which(candidate)
-        if path:
-            return path
+def _find_c_compiler() -> str | None:
+    primary = resolve_tool("clang", required=False)
+    if primary.source != "missing":
+        return str(primary.path)
+    if HOST_OS != "windows":
+        fallback = resolve_tool("cc", required=False, allow_system=True)
+        if fallback.source != "missing":
+            return str(fallback.path)
+        fallback = resolve_tool("gcc", required=False, allow_system=True)
+        if fallback.source != "missing":
+            return str(fallback.path)
     return None
 
 
-def _find_c_compiler() -> str | None:
-    return _find_compiler(["clang", "cc", "gcc"] if HOST_OS != "windows" else ["clang", "gcc", "cl"])
-
-
 def _find_cpp_compiler() -> str | None:
-    return _find_compiler(["clang++", "c++", "g++"] if HOST_OS != "windows" else ["clang++", "g++", "cl"])
+    primary = resolve_tool("clang++", required=False)
+    if primary.source != "missing":
+        return str(primary.path)
+    if HOST_OS != "windows":
+        fallback = resolve_tool("c++", required=False, allow_system=True)
+        if fallback.source != "missing":
+            return str(fallback.path)
+        fallback = resolve_tool("g++", required=False, allow_system=True)
+        if fallback.source != "missing":
+            return str(fallback.path)
+    return None
 
 
 def build_java() -> Path:
     javac = resolve_tool("javac")
-    source_roots = [GUI_SRC_DIR, BENCHMARK_JAVA_SRC_DIR]
+    source_roots = [GUI_SRC_DIR, *BENCHMARK_JAVA_SOURCE_ROOTS]
     sources = sorted(str(path) for root in source_roots if root.exists() for path in root.rglob("*.java"))
     if not sources:
         raise FileNotFoundError("No Java sources found for the controller or Java benchmark implementations.")
@@ -193,3 +208,57 @@ def build_assets() -> dict[str, str]:
         "java_output_dir": str(java_dir),
         "scripts_dir": str(SCRIPTS_DIR),
     }
+
+
+def implementation_readiness_rows() -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for entry in IMPLEMENTATIONS.values():
+        status = "missing"
+        path = ""
+        message = "Implementation is not ready on this host."
+        if entry.runner_kind == "native-binary":
+            binary_path = entry.binary_path
+            path = "" if binary_path is None else str(binary_path)
+            if binary_path is not None and binary_path.exists():
+                status = "ready"
+                message = "Native benchmark binary is bundled or already built."
+            elif entry.compiler_kind == "c" and _find_c_compiler():
+                status = "buildable"
+                message = "C benchmark can be built from source with the bundled compiler."
+            elif entry.compiler_kind == "cpp" and _find_cpp_compiler():
+                status = "buildable"
+                message = "C++ benchmark can be built from source with the bundled compiler."
+            elif entry.compiler_kind == "go" and resolve_tool("go", required=False).source != "missing":
+                status = "buildable"
+                message = "Go benchmark can be built from source with the bundled Go toolchain."
+            elif entry.compiler_kind == "rust" and resolve_tool("rustc", required=False).source != "missing":
+                status = "buildable"
+                message = "Rust benchmark can be built from source with the bundled Rust toolchain."
+        elif entry.runner_kind == "java-class":
+            java = resolve_tool("java", required=False)
+            javac = resolve_tool("javac", required=False)
+            path = str(ROOT_DIR / "benchmarks" / "java")
+            if java.source != "missing" and javac.source != "missing":
+                status = "buildable"
+                message = "Java benchmark sources can be compiled and launched with the bundled JDK."
+        else:
+            runtime = resolve_tool(entry.runtime_kind, required=False)
+            path = str(entry.source_path) if entry.source_path is not None else ""
+            if runtime.source != "missing":
+                status = "ready"
+                message = f"{entry.language.title()} runtime is bundled and the worker script is launchable."
+        metadata = implementation_metadata(entry.implementation_id)
+        rows.append(
+            {
+                "component_id": entry.implementation_id,
+                "component_kind": "implementation",
+                "host": HOST_KEY,
+                "status": status,
+                "version": metadata.get("variant", "default"),
+                "path": path,
+                "required_for_launch": "false",
+                "required_for_build": "true",
+                "message": message,
+            }
+        )
+    return rows

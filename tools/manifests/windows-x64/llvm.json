@@ -1,0 +1,16 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "llvm",
+  "host": "windows-x64",
+  "version": "21.1.7",
+  "url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.7/clang%2Bllvm-21.1.7-x86_64-pc-windows-msvc.tar.xz",
+  "sha256": "70a2b73f2f14f787557f90abf380e7170b54e97b893218999144de5284b4f8f8",
+  "archive_type": "tar.xz",
+  "destination": "tools/toolchains/windows-x64/llvm",
+  "executables": ["bin/clang.exe", "bin/clang++.exe"],
+  "license_files": ["LICENSE.TXT"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "archive_subdir": "clang+llvm-21.1.7-x86_64-pc-windows-msvc"
+}

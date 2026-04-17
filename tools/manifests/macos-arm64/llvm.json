@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "tool_id": "llvm",
+  "host": "macos-arm64",
+  "version": "manual",
+  "url": "https://github.com/llvm/llvm-project/releases",
+  "sha256": "",
+  "archive_type": "tar.xz",
+  "destination": "tools/toolchains/macos-arm64/llvm",
+  "executables": ["bin/clang", "bin/clang++"],
+  "license_files": ["LICENSE.TXT"],
+  "component_kind": "toolchain",
+  "required_for_launch": false,
+  "required_for_build": true,
+  "install_enabled": false,
+  "install_hint": "macOS LLVM is left as a pinned manifest slot because the first delivery uses prebuilt mac native C/C++ workers."
+}

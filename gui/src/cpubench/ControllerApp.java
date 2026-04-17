@@ -62,7 +62,7 @@ public final class ControllerApp {
                 return candidate.toString();
             }
         }
-        return hostOs().equals("windows") ? "python.exe" : "python3";
+        throw new IllegalStateException("Bundled Python runtime is missing from the packaged application.");
     }
 
     private static String hostOs() {
