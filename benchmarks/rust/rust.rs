@@ -65,7 +65,7 @@ fn load_case(args: Vec<String>) -> CaseData {
 }
 
 fn extend_seed_pairs(count: usize) -> Vec<(u64, u64)> {
-    let mut pairs = vec![
+    let mut pairs: Vec<(u64, u64)> = vec![
         (1, 1),
         (3, 5),
         (8, 13),

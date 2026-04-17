@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from .catalog import IMPLEMENTATIONS, ImplementationEntry
+from .build import build_compiled_entry
 from .common import (
     HOST_ARCH,
     HOST_OS,
@@ -135,6 +136,7 @@ def run_profile_payload(
     stream: EventCallback | None = None,
 ) -> dict[str, str]:
     payload = profile.payload
+    runtimes = _prepare_profile_runtimes(payload["implementations"], java_output_dir=java_output_dir)
     timestamp = datetime.now()
     run_number = next_run_number()
     run_id = build_run_id(run_number, timestamp)
@@ -190,7 +192,7 @@ def run_profile_payload(
     try:
         for implementation_id in payload["implementations"]:
             entry = IMPLEMENTATIONS[implementation_id]
-            runtime = _resolve_runtime(entry)
+            runtime = runtimes[implementation_id]
             for case in payload["matrix"]:
                 for warmup_index in range(1, warmups + 1):
                     case_values = _case_values(payload["id"], implementation_id, case, defaults, warmup_index, True)
@@ -270,6 +272,11 @@ def run_profile_payload(
 def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:
     if entry.runner_kind == "native-binary":
         binary_path = entry.binary_path
+        if binary_path is not None and not binary_path.exists() and entry.compiler_kind is not None:
+            try:
+                binary_path = build_compiled_entry(entry, required=True)
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                binary_path = entry.binary_path
         if binary_path is not None and binary_path.exists():
             return ResolvedTool(name=entry.binary_stem or entry.implementation_id, path=binary_path, source="repo_binary")
         return ResolvedTool(
@@ -278,6 +285,26 @@ def _resolve_runtime(entry: ImplementationEntry) -> ResolvedTool:
             source="missing",
         )
     return resolve_tool(entry.runtime_kind, required=False)
+
+
+def _prepare_profile_runtimes(implementation_ids: list[str], *, java_output_dir: Path) -> dict[str, ResolvedTool]:
+    runtimes: dict[str, ResolvedTool] = {}
+    failures: list[str] = []
+    placeholder_case = ROOT_DIR / "build" / "tmp" / ".preflight.case"
+    for implementation_id in implementation_ids:
+        entry = IMPLEMENTATIONS[implementation_id]
+        runtime = _resolve_runtime(entry)
+        runtimes[implementation_id] = runtime
+        try:
+            _command_for_entry(entry, runtime, placeholder_case, java_output_dir)
+        except Exception as error:
+            failures.append(f"{implementation_id}: {error}")
+    if failures:
+        raise FileNotFoundError(
+            "The selected profile cannot start because some implementations are not ready on this host:\n"
+            + "\n".join(f"- {failure}" for failure in failures)
+        )
+    return runtimes
 
 
 def _resume_primary_thread(pid: int) -> None:

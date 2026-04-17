@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -17,8 +18,9 @@ from .common import (
 from .runtimes import resolve_tool
 
 
-def _run(command: list[str], *, quiet: bool = False) -> None:
-    subprocess.run(command, cwd=ROOT_DIR, check=True, capture_output=quiet, text=quiet)
+def _run(command: list[str], *, quiet: bool = False, extra_env: dict[str, str] | None = None) -> None:
+    env = None if extra_env is None else {**os.environ, **extra_env}
+    subprocess.run(command, cwd=ROOT_DIR, check=True, capture_output=quiet, text=quiet, env=env)
 
 
 def _macos_sdk_flags() -> list[str]:
@@ -147,7 +149,13 @@ def build_compiled_entry(entry: ImplementationEntry, *, required: bool) -> Path:
             if entry.binary_path.exists() or not required:
                 return entry.binary_path
             raise FileNotFoundError(f"No Go toolchain found for {entry.implementation_id}.")
-        _run([str(go.path), "build", "-o", str(entry.binary_path), str(entry.source_path)], quiet=not required)
+        go_cache_dir = BUILD_DIR / "cache" / "go-build"
+        go_cache_dir.mkdir(parents=True, exist_ok=True)
+        _run(
+            [str(go.path), "build", "-o", str(entry.binary_path), str(entry.source_path)],
+            quiet=not required,
+            extra_env={"GOCACHE": str(go_cache_dir)},
+        )
         return entry.binary_path
 
     if entry.compiler_kind == "rust":

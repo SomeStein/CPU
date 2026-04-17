@@ -1,0 +1,25 @@
+{
+  "defaults": {
+    "affinity_mode": "single_core",
+    "priority_mode": "high",
+    "repeats": 5,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "ksyn",
+  "implementations": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "matrix": [
+    {
+      "case_id": "custom_case",
+      "iterations": 20000,
+      "parallel_chains": 1
+    }
+  ],
+  "name": "ksyn",
+  "schema_version": 1
+}

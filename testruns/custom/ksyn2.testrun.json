@@ -1,0 +1,40 @@
+{
+  "defaults": {
+    "affinity_mode": "single_core",
+    "priority_mode": "high",
+    "repeats": 5,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "ksyn2",
+  "implementations": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "matrix": [
+    {
+      "case_id": "caseE7",
+      "iterations": 100000,
+      "parallel_chains": 1
+    },
+    {
+      "case_id": "caseE7C4",
+      "iterations": 100000,
+      "parallel_chains": 4
+    },
+    {
+      "case_id": "caseE8C4",
+      "iterations": 1000000,
+      "parallel_chains": 4
+    },
+    {
+      "case_id": "caseE8C8",
+      "iterations": 1000000,
+      "parallel_chains": 8
+    }
+  ],
+  "name": "ksyn2",
+  "schema_version": 1
+}

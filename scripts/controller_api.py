@@ -169,12 +169,24 @@ def command_delete_custom_profile(args: argparse.Namespace) -> int:
 
 def _run_with_events(result_runner, profile_label: str) -> int:
     headers_printed = False
-
-    def emit(event: dict[str, str]) -> None:
-        nonlocal headers_printed
-        headers = [
-            "event_type",
-            "phase",
+    headers = [
+        "event_type",
+        "phase",
+        "run_id",
+        "profile_id",
+        "implementation",
+        "case_id",
+        "repeat_index",
+        "warmup",
+        "status",
+        "metric",
+        "metric_kind",
+        "elapsed_ns",
+        "timer_kind",
+        "step_index",
+        "step_total",
+        "message",
+        *[field for field in RESULT_FIELD_ORDER if field not in {
             "run_id",
             "profile_id",
             "implementation",
@@ -182,25 +194,13 @@ def _run_with_events(result_runner, profile_label: str) -> int:
             "repeat_index",
             "warmup",
             "status",
-            "metric",
-            "metric_kind",
             "elapsed_ns",
             "timer_kind",
-            "step_index",
-            "step_total",
-            "message",
-            *[field for field in RESULT_FIELD_ORDER if field not in {
-                "run_id",
-                "profile_id",
-                "implementation",
-                "case_id",
-                "repeat_index",
-                "warmup",
-                "status",
-                "elapsed_ns",
-                "timer_kind",
-            }],
-        ]
+        }],
+    ]
+
+    def emit(event: dict[str, str]) -> None:
+        nonlocal headers_printed
         if not headers_printed:
             sys.stdout.write("\t".join(headers) + "\n")
             headers_printed = True
@@ -208,8 +208,23 @@ def _run_with_events(result_runner, profile_label: str) -> int:
         sys.stdout.write("\n")
         sys.stdout.flush()
 
-    assets = build_assets()
-    result = result_runner(Path(assets["java_output_dir"]), emit)
+    try:
+        assets = build_assets()
+        result = result_runner(Path(assets["java_output_dir"]), emit)
+    except Exception as error:
+        emit(
+            {
+                "event_type": "run",
+                "phase": "error",
+                "run_id": "",
+                "profile_id": profile_label,
+                "status": "failed",
+                "step_index": "0",
+                "step_total": "0",
+                "message": str(error),
+            }
+        )
+        return 1
     if not headers_printed:
         emit({"event_type": "run", "phase": "completed", "run_id": result["run_id"], "profile_id": profile_label, "status": result["status"]})
     return 0 if result["status"] == "success" else 1

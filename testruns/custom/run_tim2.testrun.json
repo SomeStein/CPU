@@ -1,0 +1,31 @@
+{
+  "defaults": {
+    "affinity_mode": "unchanged",
+    "priority_mode": "unchanged",
+    "repeats": 3,
+    "timer_mode": "monotonic_ns",
+    "warmups": 1
+  },
+  "id": "run_tim2",
+  "implementations": [
+    "c",
+    "cpp",
+    "java",
+    "perl",
+    "python"
+  ],
+  "matrix": [
+    {
+      "case_id": "case_easy",
+      "iterations": 1000000,
+      "parallel_chains": 8
+    },
+    {
+      "case_id": "case_mid",
+      "iterations": 10000000,
+      "parallel_chains": 8
+    }
+  ],
+  "name": "run tim2",
+  "schema_version": 1
+}

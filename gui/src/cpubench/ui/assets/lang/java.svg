@@ -1,5 +1,3 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="4" y="4" width="56" height="56" rx="16" fill="#EA2D2E"/>
-  <rect x="9" y="9" width="46" height="46" rx="12" fill="#172554" stroke="#FFE4E6" stroke-width="1.5"/>
-  <text x="32" y="39" font-family="SansSerif" font-size="17" font-weight="700" text-anchor="middle" fill="#FFE4E6">Jv</text>
+  <text x="32" y="47" font-family="SansSerif" font-size="42" font-weight="700" text-anchor="middle" fill="#EA2D2E">J</text>
 </svg>

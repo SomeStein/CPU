@@ -5,6 +5,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics2D;
+import java.awt.event.ContainerAdapter;
+import java.awt.event.ContainerEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -28,7 +30,6 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -64,18 +65,18 @@ import cpubench.ui.UiPalette;
 import cpubench.ui.charts.InteractiveTrendChart;
 import cpubench.ui.charts.InteractiveTrendChart.PointRecord;
 import cpubench.ui.icons.LanguageCellRenderer;
-import cpubench.ui.icons.LanguageListCellRenderer;
+import cpubench.ui.icons.LanguageIconRegistry;
 import cpubench.ui.shell.ActivityBar.Activity;
 
 public final class ShellFrame {
     private static final List<String> RESULT_SELECTION_KEYS = List.of("run_id", "implementation", "case_id", "warmup", "repeat_index");
-    private static final String HOME_KEY = "home";
     private static final String GLOBAL_KEY = "global";
     private static final String MONITOR_KEY = "monitor";
     private static final String BUILDER_KEY = "builder";
     private static final String RUN_OVERVIEW_KEY = "run";
     private static final String ARTIFACTS_KEY = "artifacts";
     private static final DateTimeFormatter LIVE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final List<String> DEFAULT_STATUS_OPTIONS = List.of("success", "partial_failure", "failed");
 
     private static final List<String> LIVE_EVENT_HEADERS = List.of(
         "event_type",
@@ -158,6 +159,7 @@ public final class ShellFrame {
     private final ActivityBar activityBar;
     private final SidePanel sidePanel;
     private final WorkspaceTabs workspaceTabs;
+    private final JPanel workspaceLayer = new JPanel();
     private final StatusBar statusBar;
     private final Map<String, JComponent> tabsByKey = new LinkedHashMap<>();
     private final ProfileBuilderPanel profileBuilderPanel;
@@ -178,15 +180,23 @@ public final class ShellFrame {
     private final JTextArea homeRecentRunsArea = buildTextArea();
     private final JTextArea homeProfilesArea = buildTextArea();
     private final JTextArea homeBestArea = buildTextArea();
+    private final JComponent homeBackground = buildHomeScreen();
 
-    private final JComboBox<String> runImplementationFilter = new JComboBox<>(new String[] {"All"});
-    private final JComboBox<String> runCaseFilter = new JComboBox<>(new String[] {"All"});
-    private final JComboBox<String> runStatusFilter = new JComboBox<>(new String[] {"All", "success", "partial_failure", "failed"});
+    private final JPanel runImplementationFilterPanel = checklistPanel();
+    private final JPanel runCaseFilterPanel = checklistPanel();
+    private final JPanel runStatusFilterPanel = checklistPanel();
+    private final Map<String, JCheckBox> runImplementationChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> runCaseChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> runStatusChecks = new LinkedHashMap<>();
     private final JCheckBox runMeasuredOnlyToggle = new JCheckBox("Hide Warmups", true);
-    private final JComboBox<String> globalProfileFilter = new JComboBox<>(new String[] {"All"});
-    private final JComboBox<String> globalImplementationFilter = new JComboBox<>(new String[] {"All"});
-    private final JComboBox<String> globalCaseFilter = new JComboBox<>(new String[] {"All"});
-    private final JComboBox<String> globalStatusFilter = new JComboBox<>(new String[] {"All", "success", "partial_failure", "failed"});
+    private final JPanel globalProfileFilterPanel = checklistPanel();
+    private final JPanel globalImplementationFilterPanel = checklistPanel();
+    private final JPanel globalCaseFilterPanel = checklistPanel();
+    private final JPanel globalStatusFilterPanel = checklistPanel();
+    private final Map<String, JCheckBox> globalProfileChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> globalImplementationChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> globalCaseChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> globalStatusChecks = new LinkedHashMap<>();
     private final JCheckBox globalMeasuredOnlyToggle = new JCheckBox("Hide Warmups", true);
 
     private final DefaultTableModel runsModel = new DefaultTableModel();
@@ -205,6 +215,7 @@ public final class ShellFrame {
     private final ImplementationBarChartPanel globalBarChart = new ImplementationBarChartPanel();
 
     private String pendingRunSelection = "";
+    private String loadedRunId = "";
     private Process activeProcess;
     private List<String> runEventHeaders = List.of();
     private Activity activeActivity = Activity.RUNS;
@@ -258,17 +269,28 @@ public final class ShellFrame {
         shell.setOpaque(false);
         shell.setBorder(BorderFactory.createEmptyBorder(UiPalette.GAP_MD, 0, 0, UiPalette.GAP_MD));
         shell.add(sidePanel, BorderLayout.WEST);
-        shell.add(workspaceTabs, BorderLayout.CENTER);
+        workspaceLayer.setOpaque(false);
+        workspaceLayer.setLayout(new javax.swing.OverlayLayout(workspaceLayer));
+        homeBackground.setAlignmentX(0f);
+        homeBackground.setAlignmentY(0f);
+        workspaceTabs.setAlignmentX(0f);
+        workspaceTabs.setAlignmentY(0f);
+        workspaceLayer.add(homeBackground);
+        workspaceLayer.add(workspaceTabs);
+        workspaceTabs.addContainerListener(new ContainerAdapter() {
+            @Override
+            public void componentAdded(ContainerEvent event) {
+                updateWorkspaceOverlay();
+            }
+
+            @Override
+            public void componentRemoved(ContainerEvent event) {
+                updateWorkspaceOverlay();
+            }
+        });
+        shell.add(workspaceLayer, BorderLayout.CENTER);
         shell.add(statusBar, BorderLayout.SOUTH);
         frame.add(shell, BorderLayout.CENTER);
-
-        configureCombo(runImplementationFilter);
-        configureCombo(runCaseFilter);
-        configureCombo(runStatusFilter);
-        configureCombo(globalProfileFilter);
-        configureCombo(globalImplementationFilter);
-        configureCombo(globalCaseFilter);
-        configureCombo(globalStatusFilter);
 
         sidePanel.addPanel(Activity.RUNS, buildRunsSideView());
         sidePanel.addPanel(Activity.ANALYSIS, buildAnalysisSideView());
@@ -277,9 +299,7 @@ public final class ShellFrame {
         sidePanel.addPanel(Activity.CONFIG, buildConfigSideView());
         sidePanel.addPanel(Activity.DOCS, buildDocsSideView());
         sidePanel.showPanel(Activity.RUNS);
-
-        openScreen(HOME_KEY, "Home", IconFactory.logsIcon(14, UiPalette.ACCENT), buildHomeScreen(), false);
-        workspaceTabs.setSelectedIndex(0);
+        updateWorkspaceOverlay();
 
         statusBar.runButton().addActionListener(event -> startRun());
         statusBar.refreshButton().addActionListener(event -> refreshAll(true));
@@ -390,46 +410,9 @@ public final class ShellFrame {
     }
 
     private void installFilterInteractions() {
-        runImplementationFilter.setRenderer(new LanguageListCellRenderer());
-        globalImplementationFilter.setRenderer(new LanguageListCellRenderer());
-        runImplementationFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyRunFilters();
-            }
-        });
-        runCaseFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyRunFilters();
-            }
-        });
-        runStatusFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyRunFilters();
-            }
-        });
         runMeasuredOnlyToggle.addActionListener(event -> {
             if (!suppressFilterActions) {
                 applyRunFilters();
-            }
-        });
-        globalProfileFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyGlobalFilters();
-            }
-        });
-        globalImplementationFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyGlobalFilters();
-            }
-        });
-        globalCaseFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyGlobalFilters();
-            }
-        });
-        globalStatusFilter.addActionListener(event -> {
-            if (!suppressFilterActions) {
-                applyGlobalFilters();
             }
         });
         globalMeasuredOnlyToggle.addActionListener(event -> {
@@ -476,7 +459,7 @@ public final class ShellFrame {
         top.add(buttons, BorderLayout.SOUTH);
         panel.add(top, BorderLayout.NORTH);
         panel.add(tableScroll(runsTable), BorderLayout.CENTER);
-        panel.add(textSection("Selected Run", selectedRunArea, null), BorderLayout.SOUTH);
+        panel.add(sideTextBlock("Selected Run", selectedRunArea, null), BorderLayout.SOUTH);
         return panel;
     }
 
@@ -488,9 +471,9 @@ public final class ShellFrame {
         JPanel stack = new JPanel();
         stack.setOpaque(false);
         stack.setLayout(new javax.swing.BoxLayout(stack, javax.swing.BoxLayout.Y_AXIS));
-        stack.add(filterSection("Run View", runImplementationFilter, runCaseFilter, runStatusFilter, runMeasuredOnlyToggle));
+        stack.add(filterSection("Run View", runImplementationFilterPanel, runCaseFilterPanel, runStatusFilterPanel, runMeasuredOnlyToggle, null));
         stack.add(javax.swing.Box.createVerticalStrut(UiPalette.GAP_MD));
-        stack.add(filterSection("Global View", globalImplementationFilter, globalCaseFilter, globalStatusFilter, globalMeasuredOnlyToggle, globalProfileFilter));
+        stack.add(filterSection("Global View", globalImplementationFilterPanel, globalCaseFilterPanel, globalStatusFilterPanel, globalMeasuredOnlyToggle, globalProfileFilterPanel));
         shell.add(stack, BorderLayout.CENTER);
         return shell;
     }
@@ -502,9 +485,9 @@ public final class ShellFrame {
         JButton openMonitor = button("Open Live Monitor", UiPalette.SURFACE);
         openMonitor.addActionListener(event -> openLiveMonitorTab());
         top.add(openMonitor, BorderLayout.NORTH);
-        top.add(textSection("Live Status", liveStatusArea, new Dimension(0, 180)), BorderLayout.CENTER);
+        top.add(sideTextBlock("Live Status", liveStatusArea, new Dimension(0, 180)), BorderLayout.CENTER);
         panel.add(top, BorderLayout.NORTH);
-        panel.add(textSection("Event Tail", monitorTailArea, null), BorderLayout.CENTER);
+        panel.add(sideTextBlock("Event Tail", monitorTailArea, null), BorderLayout.CENTER);
         return panel;
     }
 
@@ -523,7 +506,7 @@ public final class ShellFrame {
         });
         openArtifacts.addActionListener(event -> openArtifactsTab());
         panel.add(buttons, BorderLayout.NORTH);
-        panel.add(textSection("Selection", artifactSummaryArea, null), BorderLayout.CENTER);
+        panel.add(sideTextBlock("Selection", artifactSummaryArea, null), BorderLayout.CENTER);
         return panel;
     }
 
@@ -538,7 +521,7 @@ public final class ShellFrame {
         buttons.add(builderButton);
         buttons.add(deleteButton);
         panel.add(buttons, BorderLayout.NORTH);
-        panel.add(textSection("Profile Preview", profilePreviewArea, null), BorderLayout.CENTER);
+        panel.add(sideTextBlock("Profile Preview", profilePreviewArea, null), BorderLayout.CENTER);
         return panel;
     }
 
@@ -690,6 +673,7 @@ public final class ShellFrame {
                     if (!pendingRunSelection.isBlank()) {
                         if (Objects.equals(state.liveRunId(), pendingRunSelection)) {
                             state.clearLiveRun();
+                            loadedRunId = "";
                             liveManifest = Map.of();
                             applyRunsSearch();
                             populateGlobalFilters();
@@ -698,11 +682,14 @@ public final class ShellFrame {
                         selectRunRow(pendingRunSelection, true);
                         pendingRunSelection = "";
                     } else if (!state.currentRunId().isBlank() && hasDisplayedRun(state.currentRunId())) {
-                        selectRunRow(state.currentRunId(), false);
+                        restoreSelectionByKey(runsTable, runsModel, "run_id", state.currentRunId());
+                        if (!Objects.equals(loadedRunId, state.currentRunId())) {
+                            loadRun(state.currentRunId(), false);
+                        }
                     } else if (!state.currentRunId().isBlank()) {
                         state.setCurrentRunId("");
+                        closeRunBoundScreens();
                         clearRunWorkspace();
-                        workspaceTabs.setSelectedComponent(tabsByKey.get(HOME_KEY));
                     } else {
                         clearRunWorkspace();
                     }
@@ -824,8 +811,12 @@ public final class ShellFrame {
     }
 
     private void loadRun(String runId, boolean openTab) {
+        if (!openTab && Objects.equals(runId, loadedRunId)) {
+            return;
+        }
         if (Objects.equals(runId, state.liveRunId())) {
             state.setCurrentRunId(runId);
+            loadedRunId = runId;
             state.setRunResults(TableData.empty());
             state.setRunEvents(TableData.empty());
             applyTable(eventsTable, eventsModel, state.displayedRunEvents());
@@ -857,6 +848,7 @@ public final class ShellFrame {
             protected void done() {
                 try {
                     get();
+                    loadedRunId = runId;
                     state.setRunResults(loadedResults);
                     state.setRunEvents(loadedEvents);
                     state.setRunManifest(loadedManifest);
@@ -878,31 +870,88 @@ public final class ShellFrame {
     }
 
     private void populateRunFilters() {
-        repopulateCombo(runImplementationFilter, state.displayedRunResults().distinctValues("implementation"));
-        repopulateCombo(runCaseFilter, state.displayedRunResults().distinctValues("case_id"));
+        TableData runData = state.displayedRunResults();
+        repopulateChecklist(
+            runImplementationFilterPanel,
+            runImplementationChecks,
+            orderedValues(runData.distinctValues("implementation")),
+            true,
+            this::applyRunFilters
+        );
+        repopulateChecklist(
+            runCaseFilterPanel,
+            runCaseChecks,
+            orderedValues(runData.distinctValues("case_id")),
+            false,
+            this::applyRunFilters
+        );
+        repopulateChecklist(
+            runStatusFilterPanel,
+            runStatusChecks,
+            orderedStatusValues(runData.distinctValues("status")),
+            false,
+            this::applyRunFilters
+        );
     }
 
     private void populateGlobalFilters() {
-        repopulateCombo(globalProfileFilter, state.displayedGlobalResults().distinctValues("profile_id"));
-        repopulateCombo(globalImplementationFilter, state.displayedGlobalResults().distinctValues("implementation"));
-        repopulateCombo(globalCaseFilter, state.displayedGlobalResults().distinctValues("case_id"));
+        TableData globalData = state.displayedGlobalResults();
+        repopulateChecklist(
+            globalProfileFilterPanel,
+            globalProfileChecks,
+            orderedValues(globalData.distinctValues("profile_id")),
+            false,
+            this::applyGlobalFilters
+        );
+        repopulateChecklist(
+            globalImplementationFilterPanel,
+            globalImplementationChecks,
+            orderedValues(globalData.distinctValues("implementation")),
+            true,
+            this::applyGlobalFilters
+        );
+        repopulateChecklist(
+            globalCaseFilterPanel,
+            globalCaseChecks,
+            orderedValues(globalData.distinctValues("case_id")),
+            false,
+            this::applyGlobalFilters
+        );
+        repopulateChecklist(
+            globalStatusFilterPanel,
+            globalStatusChecks,
+            orderedStatusValues(globalData.distinctValues("status")),
+            false,
+            this::applyGlobalFilters
+        );
     }
 
-    private void repopulateCombo(JComboBox<String> combo, Set<String> values) {
-        String previous = (String) combo.getSelectedItem();
+    private void repopulateChecklist(
+        JPanel panel,
+        Map<String, JCheckBox> checks,
+        Set<String> values,
+        boolean iconOnly,
+        Runnable onChange
+    ) {
+        Set<String> previousSelection = selectedValues(checks);
+        boolean selectAll = checks.isEmpty() || previousSelection == null;
         suppressFilterActions = true;
         try {
-            combo.removeAllItems();
-            combo.addItem("All");
+            panel.removeAll();
+            checks.clear();
             for (String value : values) {
-                combo.addItem(value);
+                JCheckBox checkBox = buildChecklistBox(value, iconOnly);
+                checkBox.setSelected(selectAll || previousSelection.contains(value));
+                checkBox.addActionListener(event -> {
+                    if (!suppressFilterActions) {
+                        onChange.run();
+                    }
+                });
+                checks.put(value, checkBox);
+                panel.add(checkBox);
             }
-            if (previous != null) {
-                combo.setSelectedItem(previous);
-            }
-            if (combo.getSelectedItem() == null) {
-                combo.setSelectedIndex(0);
-            }
+            panel.revalidate();
+            panel.repaint();
         } finally {
             suppressFilterActions = false;
         }
@@ -947,20 +996,20 @@ public final class ShellFrame {
 
     private FilterState currentRunFilter() {
         return new FilterState(
-            String.valueOf(runImplementationFilter.getSelectedItem()),
-            String.valueOf(runCaseFilter.getSelectedItem()),
-            String.valueOf(runStatusFilter.getSelectedItem()),
-            "All",
+            selectedValues(runImplementationChecks),
+            selectedValues(runCaseChecks),
+            selectedValues(runStatusChecks),
+            null,
             runMeasuredOnlyToggle.isSelected()
         );
     }
 
     private FilterState currentGlobalFilter() {
         return new FilterState(
-            String.valueOf(globalImplementationFilter.getSelectedItem()),
-            String.valueOf(globalCaseFilter.getSelectedItem()),
-            String.valueOf(globalStatusFilter.getSelectedItem()),
-            String.valueOf(globalProfileFilter.getSelectedItem()),
+            selectedValues(globalImplementationChecks),
+            selectedValues(globalCaseChecks),
+            selectedValues(globalStatusChecks),
+            selectedValues(globalProfileChecks),
             globalMeasuredOnlyToggle.isSelected()
         );
     }
@@ -1623,6 +1672,22 @@ public final class ShellFrame {
         workspaceTabs.setSelectedComponent(component);
     }
 
+    private void closeScreen(String key) {
+        JComponent component = tabsByKey.remove(key);
+        if (component == null) {
+            return;
+        }
+        int index = workspaceTabs.indexOfComponent(component);
+        if (index >= 0) {
+            workspaceTabs.removeTabAt(index);
+        }
+    }
+
+    private void closeRunBoundScreens() {
+        closeScreen(RUN_OVERVIEW_KEY);
+        closeScreen(ARTIFACTS_KEY);
+    }
+
     private void handleActivitySelection(Activity activity) {
         if (activeActivity == activity && !sidePanel.isCollapsed()) {
             sidePanel.setCollapsed(true);
@@ -1635,6 +1700,7 @@ public final class ShellFrame {
     }
 
     private void clearRunWorkspace() {
+        loadedRunId = "";
         state.setRunResults(TableData.empty());
         state.setRunEvents(TableData.empty());
         state.setRunManifest(TableData.empty());
@@ -1650,6 +1716,14 @@ public final class ShellFrame {
         runChart.setSeries(List.of());
         runBarChart.setBars("Best By Implementation", "Select a run to compare implementations.", "ns/iter", List.of());
         liveChart.setSeries(List.of());
+    }
+
+    private void updateWorkspaceOverlay() {
+        boolean hasScreens = workspaceTabs.getTabCount() > 0;
+        workspaceTabs.setVisible(hasScreens);
+        homeBackground.setVisible(!hasScreens);
+        workspaceLayer.revalidate();
+        workspaceLayer.repaint();
     }
 
     private void configureTable(JTable table) {
@@ -1718,6 +1792,21 @@ public final class ShellFrame {
         return panel;
     }
 
+    private JPanel sideTextBlock(String titleText, JTextArea area, Dimension size) {
+        JScrollPane scroll = new JScrollPane(area);
+        scroll.getViewport().setBackground(UiPalette.SURFACE);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        if (size != null) {
+            scroll.setPreferredSize(size);
+        }
+
+        JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
+        panel.setOpaque(false);
+        panel.add(label(titleText), BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        return panel;
+    }
+
     private JPanel sideCard(String title) {
         JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_MD));
         panel.setBackground(UiPalette.PANEL);
@@ -1726,30 +1815,66 @@ public final class ShellFrame {
         return panel;
     }
 
-    private JPanel filterSection(String title, JComboBox<String> implementation, JComboBox<String> caseFilter, JComboBox<String> status, JCheckBox measuredOnly) {
-        return filterSection(title, implementation, caseFilter, status, measuredOnly, null);
-    }
-
-    private JPanel filterSection(String title, JComboBox<String> implementation, JComboBox<String> caseFilter, JComboBox<String> status, JCheckBox measuredOnly, JComboBox<String> profile) {
+    private JPanel filterSection(String title, JPanel implementation, JPanel caseFilter, JPanel status, JCheckBox measuredOnly, JPanel profile) {
         JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
         panel.setOpaque(false);
         panel.add(label(title), BorderLayout.NORTH);
-        JPanel grid = new JPanel(new java.awt.GridLayout(profile == null ? 4 : 5, 2, UiPalette.GAP_SM, UiPalette.GAP_SM));
-        grid.setOpaque(false);
+        JPanel stack = new JPanel();
+        stack.setOpaque(false);
+        stack.setLayout(new javax.swing.BoxLayout(stack, javax.swing.BoxLayout.Y_AXIS));
         if (profile != null) {
-            grid.add(label("Profile"));
-            grid.add(profile);
+            stack.add(checklistSection("Profile", profile, 118));
+            stack.add(javax.swing.Box.createVerticalStrut(UiPalette.GAP_SM));
         }
-        grid.add(label("Implementation"));
-        grid.add(implementation);
-        grid.add(label("Case"));
-        grid.add(caseFilter);
-        grid.add(label("Status"));
-        grid.add(status);
-        grid.add(new JLabel());
-        grid.add(measuredOnly);
-        panel.add(grid, BorderLayout.CENTER);
+        stack.add(checklistSection("Implementation", implementation, 132));
+        stack.add(javax.swing.Box.createVerticalStrut(UiPalette.GAP_SM));
+        stack.add(checklistSection("Case", caseFilter, 132));
+        stack.add(javax.swing.Box.createVerticalStrut(UiPalette.GAP_SM));
+        stack.add(checklistSection("Status", status, 106));
+        stack.add(javax.swing.Box.createVerticalStrut(UiPalette.GAP_SM));
+        measuredOnly.setOpaque(false);
+        measuredOnly.setForeground(UiPalette.TEXT);
+        measuredOnly.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        stack.add(measuredOnly);
+        panel.add(stack, BorderLayout.CENTER);
         return panel;
+    }
+
+    private JPanel checklistSection(String title, JPanel checklist, int preferredHeight) {
+        JScrollPane scroll = new JScrollPane(checklist);
+        scroll.getViewport().setBackground(UiPalette.SURFACE);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setPreferredSize(new Dimension(0, preferredHeight));
+
+        JPanel panel = new JPanel(new BorderLayout(0, UiPalette.GAP_SM));
+        panel.setOpaque(false);
+        panel.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        panel.add(label(title), BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel checklistPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new javax.swing.BoxLayout(panel, javax.swing.BoxLayout.Y_AXIS));
+        panel.setBackground(UiPalette.SURFACE);
+        panel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        return panel;
+    }
+
+    private JCheckBox buildChecklistBox(String value, boolean iconOnly) {
+        JCheckBox checkBox = new JCheckBox(iconOnly ? LanguageIconRegistry.displayName(value) : value);
+        checkBox.setOpaque(false);
+        checkBox.setForeground(UiPalette.TEXT);
+        checkBox.setFocusPainted(false);
+        checkBox.setFont(UiPalette.BODY);
+        checkBox.setAlignmentX(JComponent.LEFT_ALIGNMENT);
+        if (iconOnly) {
+            checkBox.setIcon(LanguageIconRegistry.icon(value, 16));
+            checkBox.setIconTextGap(8);
+            checkBox.setToolTipText(LanguageIconRegistry.displayName(value));
+        }
+        return checkBox;
     }
 
     private JPanel labelledField(String title, JComponent component) {
@@ -1868,8 +1993,8 @@ public final class ShellFrame {
             backend.deleteRun(runId);
             if (Objects.equals(state.currentRunId(), runId)) {
                 state.setCurrentRunId("");
+                closeRunBoundScreens();
                 clearRunWorkspace();
-                workspaceTabs.setSelectedComponent(tabsByKey.get(HOME_KEY));
             }
             refreshAll(true);
         } catch (Exception error) {
@@ -1929,9 +2054,39 @@ public final class ShellFrame {
         return area;
     }
 
-    private void configureCombo(JComboBox<String> combo) {
-        combo.setBackground(UiPalette.SURFACE);
-        combo.setForeground(UiPalette.TEXT);
+    private static Set<String> orderedValues(Set<String> values) {
+        List<String> ordered = new ArrayList<>(values);
+        ordered.sort(String::compareToIgnoreCase);
+        return new LinkedHashSet<>(ordered);
+    }
+
+    private static Set<String> orderedStatusValues(Set<String> values) {
+        LinkedHashSet<String> ordered = new LinkedHashSet<>(DEFAULT_STATUS_OPTIONS);
+        List<String> extras = new ArrayList<>();
+        for (String value : values) {
+            if (!ordered.contains(value)) {
+                extras.add(value);
+            }
+        }
+        extras.sort(String::compareToIgnoreCase);
+        ordered.addAll(extras);
+        return ordered;
+    }
+
+    private static Set<String> selectedValues(Map<String, JCheckBox> checks) {
+        if (checks.isEmpty()) {
+            return null;
+        }
+        boolean allSelected = true;
+        Set<String> selected = new LinkedHashSet<>();
+        for (Map.Entry<String, JCheckBox> entry : checks.entrySet()) {
+            if (entry.getValue().isSelected()) {
+                selected.add(entry.getKey());
+            } else {
+                allSelected = false;
+            }
+        }
+        return allSelected ? null : selected;
     }
 
     private void setStatus(String text, Color color) {
@@ -1952,8 +2107,12 @@ public final class ShellFrame {
         }
         for (int row = 0; row < runsModel.getRowCount(); row += 1) {
             if (Objects.equals(runId, runsModel.getValueAt(row, runIdColumn))) {
-                runsTable.setRowSelectionInterval(row, row);
-                loadRun(runId, openTab);
+                if (!isSelectedModelRow(runsTable, row)) {
+                    runsTable.setRowSelectionInterval(row, row);
+                }
+                if (openTab || !Objects.equals(runId, loadedRunId)) {
+                    loadRun(runId, openTab);
+                }
                 return;
             }
         }
@@ -1981,7 +2140,9 @@ public final class ShellFrame {
         }
         for (int row = 0; row < model.getRowCount(); row += 1) {
             if (Objects.equals(value, String.valueOf(model.getValueAt(row, column)))) {
-                table.setRowSelectionInterval(row, row);
+                if (!isSelectedModelRow(table, row)) {
+                    table.setRowSelectionInterval(row, row);
+                }
                 return true;
             }
         }
@@ -2013,11 +2174,18 @@ public final class ShellFrame {
                 values.put(column, columnIndex >= 0 ? String.valueOf(model.getValueAt(row, columnIndex)) : "");
             }
             if (Objects.equals(key, compositeKey(values, columns))) {
-                table.setRowSelectionInterval(row, row);
+                if (!isSelectedModelRow(table, row)) {
+                    table.setRowSelectionInterval(row, row);
+                }
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isSelectedModelRow(JTable table, int modelRow) {
+        int selectedRow = table.getSelectedRow();
+        return selectedRow >= 0 && table.convertRowIndexToModel(selectedRow) == modelRow;
     }
 
     private static String compositeKey(Map<String, String> values, List<String> columns) {

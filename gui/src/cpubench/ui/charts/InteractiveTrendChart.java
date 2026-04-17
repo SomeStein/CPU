@@ -8,6 +8,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Cursor;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -56,6 +57,8 @@ public final class InteractiveTrendChart extends JComponent {
     private double dragStartMaxX;
     private double dragStartMinY;
     private double dragStartMaxY;
+    private double dragAnchorXRatio;
+    private double dragAnchorYRatio;
     private double viewMinX = Double.NaN;
     private double viewMaxX = Double.NaN;
     private double viewMinY = Double.NaN;
@@ -73,12 +76,14 @@ public final class InteractiveTrendChart extends JComponent {
             @Override
             public void mouseMoved(MouseEvent event) {
                 hoverPoint = findNearest(event.getPoint());
+                setCursor(cursorFor(dragModeFor(event.getPoint())));
                 repaint();
             }
 
             @Override
             public void mouseExited(MouseEvent event) {
                 hoverPoint = null;
+                setCursor(Cursor.getDefaultCursor());
                 repaint();
             }
 
@@ -86,10 +91,14 @@ public final class InteractiveTrendChart extends JComponent {
             public void mousePressed(MouseEvent event) {
                 dragMode = dragModeFor(event.getPoint());
                 dragPoint = event.getPoint();
+                Rectangle plot = plotBounds();
+                dragAnchorXRatio = clamp((event.getX() - plot.x) / Math.max(1.0, plot.getWidth()), 0.0, 1.0);
+                dragAnchorYRatio = clamp((plot.y + plot.height - event.getY()) / Math.max(1.0, plot.getHeight()), 0.0, 1.0);
                 dragStartMinX = currentMinX();
                 dragStartMaxX = currentMaxX();
                 dragStartMinY = currentMinY();
                 dragStartMaxY = currentMaxY();
+                setCursor(cursorFor(dragMode));
             }
 
             @Override
@@ -112,6 +121,7 @@ public final class InteractiveTrendChart extends JComponent {
             public void mouseReleased(MouseEvent event) {
                 dragMode = DragMode.NONE;
                 dragPoint = null;
+                setCursor(cursorFor(dragModeFor(event.getPoint())));
             }
 
             @Override
@@ -173,8 +183,9 @@ public final class InteractiveTrendChart extends JComponent {
             return;
         }
         double width = Math.max(1e-6, hi - lo);
-        double clampedLo = Math.max(domainMin, Math.min(lo, domainMax - width));
-        double clampedHi = Math.min(domainMax, clampedLo + width);
+        double overscroll = overscrollMargin(domainMax - domainMin, 1.0);
+        double clampedLo = Math.max(domainMin - overscroll, Math.min(lo, domainMax + overscroll - width));
+        double clampedHi = Math.min(domainMax + overscroll, clampedLo + width);
         viewMinX = clampedLo;
         viewMaxX = clampedHi;
         scheduleRepaint();
@@ -187,8 +198,9 @@ public final class InteractiveTrendChart extends JComponent {
             return;
         }
         double height = Math.max(1e-9, hi - lo);
-        double clampedLo = Math.max(domainMin, Math.min(lo, domainMax - height));
-        double clampedHi = Math.min(domainMax, clampedLo + height);
+        double overscroll = overscrollMargin(domainMax - domainMin, 1e-6);
+        double clampedLo = Math.max(domainMin - overscroll, Math.min(lo, domainMax + overscroll - height));
+        double clampedHi = Math.min(domainMax + overscroll, clampedLo + height);
         viewMinY = clampedLo;
         viewMaxY = clampedHi;
         scheduleRepaint();
@@ -302,10 +314,12 @@ public final class InteractiveTrendChart extends JComponent {
         int y = plot.y + plot.height + 18;
         graphics.setColor(UiPalette.PANEL_ALT);
         graphics.fillRoundRect(plot.x, y, plot.width, 4, 4, 4);
-        int left = plot.x + (int) Math.round((currentMinX() - domainMin) / (domainMax - domainMin) * plot.width);
-        int width = (int) Math.max(12, Math.round((currentMaxX() - currentMinX()) / (domainMax - domainMin) * plot.width));
+        double leftRatio = clamp((currentMinX() - domainMin) / (domainMax - domainMin), 0.0, 1.0);
+        double rightRatio = clamp((currentMaxX() - domainMin) / (domainMax - domainMin), 0.0, 1.0);
+        int left = plot.x + (int) Math.round(leftRatio * plot.width);
+        int width = (int) Math.max(12, Math.round((rightRatio - leftRatio) * plot.width));
         graphics.setColor(UiPalette.ACCENT);
-        graphics.fillRoundRect(left, y, Math.min(width, plot.width), 4, 4, 4);
+        graphics.fillRoundRect(left, y, Math.max(12, Math.min(width, plot.width - Math.max(0, left - plot.x))), 4, 4, 4);
     }
 
     private void paintAxisHandles(Graphics2D graphics, Rectangle plot) {
@@ -365,14 +379,14 @@ public final class InteractiveTrendChart extends JComponent {
     }
 
     private DragMode dragModeFor(Point point) {
-        if (plotBounds().contains(point)) {
-            return DragMode.PAN;
-        }
         if (xAxisBounds().contains(point)) {
             return DragMode.SCALE_X;
         }
         if (yAxisBounds().contains(point)) {
             return DragMode.SCALE_Y;
+        }
+        if (plotBounds().contains(point)) {
+            return DragMode.PAN;
         }
         return DragMode.NONE;
     }
@@ -387,17 +401,19 @@ public final class InteractiveTrendChart extends JComponent {
     }
 
     private void scaleXByDrag(MouseEvent event, Rectangle plot) {
-        double center = dragStartMinX + (dragStartMaxX - dragStartMinX) / 2.0;
+        double anchorX = dragStartMinX + (dragStartMaxX - dragStartMinX) * dragAnchorXRatio;
         double factor = Math.exp((event.getX() - dragPoint.x) / Math.max(40.0, plot.getWidth()));
-        double halfSpan = Math.max(1e-6, (dragStartMaxX - dragStartMinX) * factor / 2.0);
-        setXWindow(center - halfSpan, center + halfSpan);
+        double nextMin = anchorX - (anchorX - dragStartMinX) * factor;
+        double nextMax = anchorX + (dragStartMaxX - anchorX) * factor;
+        setXWindow(nextMin, nextMax);
     }
 
     private void scaleYByDrag(MouseEvent event, Rectangle plot) {
-        double center = dragStartMinY + (dragStartMaxY - dragStartMinY) / 2.0;
+        double anchorY = dragStartMinY + (dragStartMaxY - dragStartMinY) * dragAnchorYRatio;
         double factor = Math.exp((dragPoint.y - event.getY()) / Math.max(40.0, plot.getHeight()));
-        double halfSpan = Math.max(1e-9, (dragStartMaxY - dragStartMinY) * factor / 2.0);
-        setYWindow(center - halfSpan, center + halfSpan);
+        double nextMin = anchorY - (anchorY - dragStartMinY) * factor;
+        double nextMax = anchorY + (dragStartMaxY - anchorY) * factor;
+        setYWindow(nextMin, nextMax);
     }
 
     private List<PointRecord> visiblePoints(List<PointRecord> points, double minX, double maxX) {
@@ -422,12 +438,14 @@ public final class InteractiveTrendChart extends JComponent {
 
     private Rectangle xAxisBounds() {
         Rectangle plot = plotBounds();
-        return new Rectangle(plot.x, plot.y + plot.height + 2, plot.width, 16);
+        int top = Math.max(0, plot.y + plot.height - 6);
+        int height = Math.max(34, getHeight() - top - 8);
+        return new Rectangle(Math.max(0, plot.x - 6), top, plot.width + 12, height);
     }
 
     private Rectangle yAxisBounds() {
         Rectangle plot = plotBounds();
-        return new Rectangle(Math.max(0, plot.x - 18), plot.y, 18, plot.height);
+        return new Rectangle(0, Math.max(0, plot.y - 6), Math.max(56, plot.x + 6), plot.height + 12);
     }
 
     private void zoomX(Point mousePoint, double wheelRotation) {
@@ -529,6 +547,24 @@ public final class InteractiveTrendChart extends JComponent {
         if (!repaintTimer.isRunning()) {
             repaintTimer.start();
         }
+    }
+
+    private static Cursor cursorFor(DragMode mode) {
+        return switch (mode) {
+            case PAN -> Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
+            case SCALE_X -> Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR);
+            case SCALE_Y -> Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR);
+            case NONE -> Cursor.getDefaultCursor();
+        };
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static double overscrollMargin(double span, double minimum) {
+        double safeSpan = Math.max(minimum, span);
+        return Math.max(minimum, safeSpan * 1.2);
     }
 
     private static void drawCentered(Graphics2D graphics, String text, int x, int y) {

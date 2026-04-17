@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect x="4" y="4" width="56" height="56" rx="16" fill="#3776AB"/>
-  <rect x="9" y="9" width="46" height="46" rx="12" fill="#111827" stroke="#FDE68A" stroke-width="1.5"/>
-  <text x="32" y="39" font-family="SansSerif" font-size="18" font-weight="700" text-anchor="middle" fill="#FDE68A">Py</text>
+  <rect x="12" y="10" width="24" height="22" rx="8" fill="#3776AB"/>
+  <rect x="28" y="32" width="24" height="22" rx="8" fill="#FFD43B"/>
+  <rect x="18" y="26" width="16" height="12" rx="6" fill="#3776AB"/>
+  <rect x="30" y="26" width="16" height="12" rx="6" fill="#FFD43B"/>
+  <circle cx="28" cy="18" r="2.5" fill="#FFFFFF"/>
+  <circle cx="36" cy="46" r="2.5" fill="#1F2937"/>
 </svg>
